@@ -143,7 +143,7 @@ class AIDataAnalysisApp:
             
             openai_model = st.selectbox(
                 "Select OpenAI Model",
-                ["gpt-4-turbo-preview", "gpt-4", "gpt-3.5-turbo-16k"],
+                ["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo", "gpt-3.5-turbo-16k"],
                 help="Choose the OpenAI model for analysis"
             )
             
@@ -166,7 +166,7 @@ class AIDataAnalysisApp:
             
             claude_model = st.selectbox(
                 "Select Claude Model",
-                ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
+                ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
                 help="Choose the Claude model for analysis"
             )
             
