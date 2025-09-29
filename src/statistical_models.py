@@ -5,6 +5,7 @@ Advanced statistical analysis with PCA, FAMD, and other techniques
 
 import pandas as pd
 import numpy as np
+from typing import Dict, List, Any, Optional, Tuple
 from scipy import stats
 from scipy.stats import normaltest, shapiro, anderson, kstest
 from scipy.stats import pearsonr, spearmanr, kendalltau
@@ -14,7 +15,10 @@ from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
 from sklearn.ensemble import IsolationForest
 from sklearn.feature_selection import mutual_info_regression, mutual_info_classif
-import prince  # For FAMD
+try:
+    import prince  # For FAMD
+except ImportError:
+    prince = None
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import adfuller, acf, pacf
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
