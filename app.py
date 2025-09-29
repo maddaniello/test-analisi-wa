@@ -129,8 +129,10 @@ class AIDataAnalysisApp:
     
     def step1_api_authentication(self):
         """Step 1: API Authentication"""
-        st.markdown('<div class="step-header">🔐 Step 1: AI API Authentication</div>', 
+        st.markdown('<div class="step-header">🔐 Step 1: AI API Authentication (Optional)</div>', 
                    unsafe_allow_html=True)
+        
+        st.info("💡 You can use either OpenAI, Claude, or both. If you don't have API keys, you can still use the statistical analysis features.")
         
         col1, col2 = st.columns(2)
         
@@ -149,13 +151,13 @@ class AIDataAnalysisApp:
                 help="Choose the OpenAI model for analysis"
             )
             
-            if st.button("Validate OpenAI Key", key="validate_openai"):
-                if validate_api_key(openai_key, 'openai'):
+            if st.button("Set OpenAI Key", key="set_openai"):
+                if openai_key:
                     st.session_state.api_keys['openai'] = openai_key
                     st.session_state.api_keys['openai_model'] = openai_model
-                    st.success("✅ OpenAI API key validated successfully!")
+                    st.success("✅ OpenAI API key set! (validation skipped for faster setup)")
                 else:
-                    st.error("❌ Invalid OpenAI API key")
+                    st.warning("Please enter an API key")
         
         with col2:
             st.subheader("Claude Configuration")
@@ -172,20 +174,52 @@ class AIDataAnalysisApp:
                 help="Choose the Claude model for analysis"
             )
             
-            if st.button("Validate Claude Key", key="validate_claude"):
-                if validate_api_key(claude_key, 'claude'):
+            if st.button("Set Claude Key", key="set_claude"):
+                if claude_key:
                     st.session_state.api_keys['claude'] = claude_key
                     st.session_state.api_keys['claude_model'] = claude_model
-                    st.success("✅ Claude API key validated successfully!")
+                    st.success("✅ Claude API key set! (validation skipped for faster setup)")
                 else:
-                    st.error("❌ Invalid Claude API key")
+                    st.warning("Please enter an API key")
+        
+        # Show current configuration status
+        st.markdown("---")
+        st.markdown("### Current Configuration:")
+        
+        config_cols = st.columns(3)
+        with config_cols[0]:
+            if st.session_state.api_keys.get('openai'):
+                st.success(f"✅ OpenAI configured ({st.session_state.api_keys.get('openai_model', 'gpt-4')})")
+            else:
+                st.info("⚪ OpenAI not configured")
+        
+        with config_cols[1]:
+            if st.session_state.api_keys.get('claude'):
+                st.success(f"✅ Claude configured ({st.session_state.api_keys.get('claude_model', 'claude-3')})")
+            else:
+                st.info("⚪ Claude not configured")
+        
+        with config_cols[2]:
+            if not st.session_state.api_keys:
+                st.warning("⚠️ No AI configured - only statistical analysis available")
         
         # Initialize AI Manager if keys are available
         if st.session_state.api_keys:
             if st.button("Initialize AI Agents", type="primary"):
                 with st.spinner("Initializing AI agents..."):
-                    st.session_state.ai_manager = AIAgentManager(st.session_state.api_keys)
-                    st.success("✅ AI agents initialized successfully!")
+                    try:
+                        st.session_state.ai_manager = AIAgentManager(st.session_state.api_keys)
+                        agent_count = len(st.session_state.ai_manager.agents)
+                        st.success(f"✅ {agent_count} AI agents initialized successfully!")
+                        
+                        # Show which agents are available
+                        if agent_count > 0:
+                            st.write("Available agents:")
+                            for agent in st.session_state.ai_manager.agents.values():
+                                st.write(f"- {agent.name} ({agent.provider}: {agent.model})")
+                    except Exception as e:
+                        st.error(f"Error initializing agents: {str(e)}")
+                        st.info("Try setting the API keys again with the correct format.")
     
     def step2_data_upload(self):
         """Step 2: Data Upload"""
