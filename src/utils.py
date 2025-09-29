@@ -30,19 +30,45 @@ def validate_api_key(api_key: str, provider: str) -> bool:
     """Validate API key by making a test request"""
     try:
         if provider == 'openai' and openai:
-            openai.api_key = api_key
-            # Test with a minimal request
-            openai.Model.list()
-            return True
+            try:
+                # For newer openai library (>=1.0.0)
+                from openai import OpenAI
+                client = OpenAI(api_key=api_key)
+                # Test with a minimal request
+                client.models.list()
+                return True
+            except ImportError:
+                # For older openai library (<1.0.0)
+                openai.api_key = api_key
+                openai.Model.list()
+                return True
+                
         elif provider == 'claude' and Anthropic:
-            client = Anthropic(api_key=api_key)
-            # Test with a minimal request - updated for new API
-            response = client.completions.create(
-                model="claude-instant-1.2",
-                prompt="\n\nHuman: test\n\nAssistant:",
-                max_tokens_to_sample=10
-            )
-            return True
+            try:
+                client = Anthropic(api_key=api_key)
+                # Test with the new messages API
+                message = client.messages.create(
+                    model="claude-3-haiku-20240307",
+                    max_tokens=10,
+                    messages=[
+                        {"role": "user", "content": "test"}
+                    ]
+                )
+                return True
+            except Exception as e:
+                # Try older API format if new one fails
+                try:
+                    client = Anthropic(api_key=api_key)
+                    response = client.completions.create(
+                        model="claude-instant-1.2",
+                        prompt="\n\nHuman: test\n\nAssistant:",
+                        max_tokens_to_sample=10
+                    )
+                    return True
+                except:
+                    logger.error(f"Claude API validation failed: {str(e)}")
+                    return False
+                    
     except Exception as e:
         logger.error(f"API key validation failed for {provider}: {str(e)}")
         return False
