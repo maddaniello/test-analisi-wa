@@ -386,6 +386,15 @@ class AIAgentManager:
                      statistical_results: Dict) -> Dict:
         """Run comprehensive analysis using multiple AI agents"""
         
+        # Check if we have any agents
+        if not self.agents:
+            logger.error("No AI agents available")
+            return {
+                'error': 'No AI agents configured. Please check API keys.',
+                'insights': [],
+                'summary': 'Analysis could not be completed due to missing API configuration.'
+            }
+        
         # Prepare data context
         data_context = self._prepare_data_context(data, column_mapping)
         
@@ -408,86 +417,184 @@ class AIAgentManager:
         Focus on actionable insights, patterns, and recommendations.
         """
         
-        # Run agents in parallel where possible
-        tasks = []
+        # Collect available agents
+        available_agents = list(self.agents.keys())
+        logger.info(f"Available agents: {available_agents}")
         
-        # Stage 1: Data exploration and pattern detection (can run in parallel)
+        # Run agents with error handling
+        all_results = []
+        errors = []
+        
+        # Stage 1: Data exploration and pattern detection
+        stage1_tasks = []
+        
         if AgentRole.DATA_EXPLORER in self.agents:
-            tasks.append(self._run_agent(
-                self.agents[AgentRole.DATA_EXPLORER],
-                base_prompt + "\nFocus on data quality, distributions, and preprocessing needs.",
-                full_context
+            stage1_tasks.append((
+                AgentRole.DATA_EXPLORER,
+                self._run_agent_safe(
+                    self.agents[AgentRole.DATA_EXPLORER],
+                    base_prompt + "\nFocus on data quality, distributions, and preprocessing needs.",
+                    full_context
+                )
             ))
         
         if AgentRole.PATTERN_DETECTOR in self.agents:
-            tasks.append(self._run_agent(
-                self.agents[AgentRole.PATTERN_DETECTOR],
-                base_prompt + "\nIdentify patterns, trends, and anomalies in the data.",
-                full_context
+            stage1_tasks.append((
+                AgentRole.PATTERN_DETECTOR,
+                self._run_agent_safe(
+                    self.agents[AgentRole.PATTERN_DETECTOR],
+                    base_prompt + "\nIdentify patterns, trends, and anomalies in the data.",
+                    full_context
+                )
             ))
         
-        # Execute Stage 1
-        stage1_results = await asyncio.gather(*tasks)
+        # Execute Stage 1 with error handling
+        if stage1_tasks:
+            stage1_results = []
+            for role, task in stage1_tasks:
+                try:
+                    result = await task
+                    stage1_results.append(result)
+                    all_results.append(result)
+                except Exception as e:
+                    logger.error(f"Error in {role}: {str(e)}")
+                    errors.append(f"{role}: {str(e)}")
+                    stage1_results.append({'error': str(e)})
         
-        # Stage 2: Statistical and predictive analysis (can run in parallel)
-        tasks = []
+        # Stage 2: Statistical and predictive analysis
+        enhanced_context = full_context
+        if all_results:
+            enhanced_context += f"\n\nInitial Analysis Results:\n{json.dumps(all_results, default=str, indent=2)[:3000]}"
         
-        # Enhance context with Stage 1 results
-        enhanced_context = full_context + f"\n\nInitial Analysis Results:\n{json.dumps(stage1_results, default=str, indent=2)[:3000]}"
+        stage2_tasks = []
         
         if AgentRole.STATISTICAL_ANALYST in self.agents:
-            tasks.append(self._run_agent(
-                self.agents[AgentRole.STATISTICAL_ANALYST],
-                base_prompt + "\nProvide detailed statistical analysis and hypothesis testing results.",
-                enhanced_context
+            stage2_tasks.append((
+                AgentRole.STATISTICAL_ANALYST,
+                self._run_agent_safe(
+                    self.agents[AgentRole.STATISTICAL_ANALYST],
+                    base_prompt + "\nProvide detailed statistical analysis and hypothesis testing results.",
+                    enhanced_context
+                )
             ))
         
         if AgentRole.PREDICTIVE_MODELER in self.agents:
-            tasks.append(self._run_agent(
-                self.agents[AgentRole.PREDICTIVE_MODELER],
-                base_prompt + "\nRecommend predictive models and forecast scenarios.",
-                enhanced_context
+            stage2_tasks.append((
+                AgentRole.PREDICTIVE_MODELER,
+                self._run_agent_safe(
+                    self.agents[AgentRole.PREDICTIVE_MODELER],
+                    base_prompt + "\nRecommend predictive models and forecast scenarios.",
+                    enhanced_context
+                )
             ))
         
-        # Execute Stage 2
-        stage2_results = await asyncio.gather(*tasks)
+        # Execute Stage 2 with error handling
+        if stage2_tasks:
+            for role, task in stage2_tasks:
+                try:
+                    result = await task
+                    all_results.append(result)
+                except Exception as e:
+                    logger.error(f"Error in {role}: {str(e)}")
+                    errors.append(f"{role}: {str(e)}")
         
-        # Stage 3: Insight generation and report writing (sequential)
-        all_results = stage1_results + stage2_results
-        final_context = full_context + f"\n\nAll Analysis Results:\n{json.dumps(all_results, default=str, indent=2)[:5000]}"
+        # Stage 3: Insight generation and report writing
+        final_context = full_context
+        if all_results:
+            final_context += f"\n\nAll Analysis Results:\n{json.dumps(all_results, default=str, indent=2)[:5000]}"
         
         insights = None
         if AgentRole.INSIGHT_GENERATOR in self.agents:
-            insights = await self._run_agent(
-                self.agents[AgentRole.INSIGHT_GENERATOR],
-                base_prompt + "\nGenerate actionable business insights and recommendations based on all analyses.",
-                final_context
-            )
+            try:
+                insights = await self._run_agent_safe(
+                    self.agents[AgentRole.INSIGHT_GENERATOR],
+                    base_prompt + "\nGenerate actionable business insights and recommendations based on all analyses.",
+                    final_context
+                )
+            except Exception as e:
+                logger.error(f"Error in Insight Generator: {str(e)}")
+                errors.append(f"Insight Generator: {str(e)}")
         
         report = None
         if AgentRole.REPORT_WRITER in self.agents:
-            report_context = final_context
-            if insights:
-                report_context += f"\n\nGenerated Insights:\n{json.dumps(insights, default=str, indent=2)[:3000]}"
-            
-            report = await self._run_agent(
-                self.agents[AgentRole.REPORT_WRITER],
-                "Create a comprehensive analysis report with executive summary, key findings, and recommendations.",
-                report_context
-            )
+            try:
+                report_context = final_context
+                if insights:
+                    report_context += f"\n\nGenerated Insights:\n{json.dumps(insights, default=str, indent=2)[:3000]}"
+                
+                report = await self._run_agent_safe(
+                    self.agents[AgentRole.REPORT_WRITER],
+                    "Create a comprehensive analysis report with executive summary, key findings, and recommendations.",
+                    report_context
+                )
+            except Exception as e:
+                logger.error(f"Error in Report Writer: {str(e)}")
+                errors.append(f"Report Writer: {str(e)}")
         
-        # Compile all results
+        # Compile results
         results = {
-            'data_exploration': stage1_results[0] if len(stage1_results) > 0 else None,
-            'patterns': stage1_results[1] if len(stage1_results) > 1 else None,
-            'statistical_analysis': stage2_results[0] if len(stage2_results) > 0 else None,
-            'predictive_modeling': stage2_results[1] if len(stage2_results) > 1 else None,
-            'insights': self._extract_insights(insights) if insights else [],
-            'report': report.get('response') if report else None,
-            'summary': self._generate_summary(all_results, insights)
+            'data_exploration': all_results[0] if len(all_results) > 0 else None,
+            'patterns': all_results[1] if len(all_results) > 1 else None,
+            'statistical_analysis': all_results[2] if len(all_results) > 2 else None,
+            'predictive_modeling': all_results[3] if len(all_results) > 3 else None,
+            'insights': self._extract_insights(insights) if insights else self._generate_fallback_insights(statistical_results),
+            'report': report.get('response') if report and 'response' in report else self._generate_fallback_report(all_results, statistical_results),
+            'summary': self._generate_summary(all_results, insights),
+            'errors': errors if errors else None
         }
         
         return results
+    
+    async def _run_agent_safe(self, agent: AIAgent, prompt: str, data_context: str) -> Dict:
+        """Run agent with error handling"""
+        try:
+            return await self._run_agent(agent, prompt, data_context)
+        except Exception as e:
+            logger.error(f"Agent {agent.name} failed: {str(e)}")
+            return {"error": str(e), "agent": agent.name}
+    
+    def _generate_fallback_insights(self, statistical_results: Dict) -> List[Dict]:
+        """Generate basic insights from statistical results when AI fails"""
+        insights = []
+        
+        if 'correlations' in statistical_results:
+            if 'significant_correlations' in statistical_results['correlations']:
+                for corr in statistical_results['correlations']['significant_correlations'][:3]:
+                    insights.append({
+                        'title': f"Strong correlation between {corr['var1']} and {corr['var2']}",
+                        'description': f"Correlation coefficient: {corr['correlation']:.2f}",
+                        'confidence': abs(corr['correlation']),
+                        'impact': 'high' if abs(corr['correlation']) > 0.7 else 'medium'
+                    })
+        
+        if 'outliers' in statistical_results:
+            insights.append({
+                'title': "Outliers detected in dataset",
+                'description': "Several variables contain outlier values that may require attention",
+                'confidence': 0.8,
+                'impact': 'medium'
+            })
+        
+        return insights
+    
+    def _generate_fallback_report(self, all_results: List[Dict], statistical_results: Dict) -> str:
+        """Generate basic report when AI report writer fails"""
+        report = "# Analysis Report\n\n"
+        report += "## Statistical Analysis Summary\n\n"
+        
+        if 'descriptive' in statistical_results:
+            report += "Descriptive statistics have been calculated for all variables.\n\n"
+        
+        if 'correlations' in statistical_results:
+            report += "Correlation analysis has been performed to identify relationships.\n\n"
+        
+        if all_results:
+            report += "## AI Analysis\n\n"
+            for result in all_results:
+                if isinstance(result, dict) and 'error' not in result:
+                    report += "- Analysis completed successfully\n"
+        
+        return report
     
     def _extract_insights(self, insights_response: Dict) -> List[Dict]:
         """Extract and structure insights from AI response"""
