@@ -1,752 +1,657 @@
-# src/data_processor.py
 """
-Data Processing Module
-Handles data preprocessing, cleaning, and transformation
+Statistical Models Module
+Advanced statistical analysis with PCA, FAMD, and other techniques
 """
 
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
-from sklearn.impute import SimpleImputer, KNNImputer
-from typing import Dict, List, Tuple, Optional
-import logging
+from typing import Dict, List, Any, Optional, Tuple
+from scipy import stats
+from scipy.stats import normaltest, shapiro, anderson, kstest
+from scipy.stats import pearsonr, spearmanr, kendalltau
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+from sklearn.decomposition import PCA, FactorAnalysis
+from sklearn.manifold import TSNE
+from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
+from sklearn.ensemble import IsolationForest
+from sklearn.feature_selection import mutual_info_regression, mutual_info_classif
+try:
+    import prince  # For FAMD
+except ImportError:
+    prince = None
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.stattools import adfuller, acf, pacf
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+import warnings
+warnings.filterwarnings('ignore')
 
-logger = logging.getLogger(__name__)
-
-class DataProcessor:
-    """Data preprocessing and cleaning engine"""
+class StatisticalAnalyzer:
+    """Advanced statistical analysis engine"""
     
     def __init__(self):
-        self.scalers = {}
-        self.encoders = {}
-        self.imputers = {}
+        self.models = self._load_statistical_models()
+        self.results = {}
         
-    def process(self, data: pd.DataFrame, 
-                column_mapping: Dict, 
-                params: Dict) -> pd.DataFrame:
-        """Process data according to specifications"""
-        
-        # Create a copy to avoid modifying original
-        processed_data = data.copy()
-        
-        # Apply sampling if needed
-        if params.get('use_sampling', False):
-            sample_size = params.get('sample_size', 10000)
-            if len(processed_data) > sample_size:
-                processed_data = processed_data.sample(n=sample_size, random_state=42)
-                logger.info(f"Data sampled to {sample_size} rows")
-        
-        # Handle missing values
-        processed_data = self._handle_missing_values(processed_data, column_mapping)
-        
-        # Process based on column types
-        for col, mapping_info in column_mapping.items():
-            if col not in processed_data.columns:
-                continue
-                
-            category = mapping_info.get('category', 'Other')
-            
-            if category == 'Date/Time':
-                processed_data = self._process_datetime(processed_data, col)
-            elif category in ['Numeric Measure', 'Currency', 'Percentage', 'Score/Rating']:
-                processed_data = self._process_numeric(processed_data, col)
-            elif category in ['Category/Label', 'Boolean']:
-                processed_data = self._process_categorical(processed_data, col)
-            elif category == 'Text/Description':
-                processed_data = self._process_text(processed_data, col)
-        
-        # Remove columns with too many missing values
-        threshold = 0.95
-        missing_pct = processed_data.isnull().sum() / len(processed_data)
-        cols_to_drop = missing_pct[missing_pct > threshold].index
-        if len(cols_to_drop) > 0:
-            processed_data = processed_data.drop(columns=cols_to_drop)
-            logger.info(f"Dropped {len(cols_to_drop)} columns with >{threshold*100}% missing values")
-        
-        return processed_data
-    
-    def _handle_missing_values(self, data: pd.DataFrame, column_mapping: Dict) -> pd.DataFrame:
-        """Handle missing values intelligently"""
-        for col in data.columns:
-            if data[col].isnull().sum() == 0:
-                continue
-            
-            missing_pct = data[col].isnull().sum() / len(data)
-            
-            if missing_pct > 0.5:
-                # Too many missing values, consider dropping
-                logger.warning(f"Column {col} has {missing_pct:.1%} missing values")
-                continue
-            
-            # Impute based on data type
-            if pd.api.types.is_numeric_dtype(data[col]):
-                # Use median for numeric columns
-                imputer = SimpleImputer(strategy='median')
-                data[col] = imputer.fit_transform(data[[col]])
-            elif pd.api.types.is_categorical_dtype(data[col]) or data[col].dtype == 'object':
-                # Use mode for categorical columns
-                imputer = SimpleImputer(strategy='most_frequent')
-                data[col] = imputer.fit_transform(data[[col]])
-            elif pd.api.types.is_datetime64_any_dtype(data[col]):
-                # Forward fill for datetime
-                data[col] = data[col].fillna(method='ffill').fillna(method='bfill')
-        
-        return data
-    
-    def _process_datetime(self, data: pd.DataFrame, col: str) -> pd.DataFrame:
-        """Extract features from datetime columns"""
-        try:
-            # Convert to datetime if not already
-            if not pd.api.types.is_datetime64_any_dtype(data[col]):
-                data[col] = pd.to_datetime(data[col], errors='coerce')
-            
-            # Extract datetime features
-            if data[col].notna().sum() > 0:
-                data[f'{col}_year'] = data[col].dt.year
-                data[f'{col}_month'] = data[col].dt.month
-                data[f'{col}_day'] = data[col].dt.day
-                data[f'{col}_dayofweek'] = data[col].dt.dayofweek
-                data[f'{col}_quarter'] = data[col].dt.quarter
-                data[f'{col}_is_weekend'] = data[col].dt.dayofweek.isin([5, 6]).astype(int)
-                
-                # Calculate days since minimum date
-                min_date = data[col].min()
-                data[f'{col}_days_since_start'] = (data[col] - min_date).dt.days
-        except Exception as e:
-            logger.error(f"Error processing datetime column {col}: {str(e)}")
-        
-        return data
-    
-    def _process_numeric(self, data: pd.DataFrame, col: str) -> pd.DataFrame:
-        """Process numeric columns"""
-        try:
-            # Convert to numeric if needed
-            if not pd.api.types.is_numeric_dtype(data[col]):
-                data[col] = pd.to_numeric(data[col], errors='coerce')
-            
-            # Log transform for skewed distributions
-            if data[col].notna().sum() > 0:
-                skewness = data[col].skew()
-                if abs(skewness) > 1:
-                    # Apply log transformation for positive values
-                    if (data[col] > 0).all():
-                        data[f'{col}_log'] = np.log1p(data[col])
-                    
-                    # Apply square root for moderate skewness
-                    elif (data[col] >= 0).all():
-                        data[f'{col}_sqrt'] = np.sqrt(data[col])
-        except Exception as e:
-            logger.error(f"Error processing numeric column {col}: {str(e)}")
-        
-        return data
-    
-    def _process_categorical(self, data: pd.DataFrame, col: str) -> pd.DataFrame:
-        """Process categorical columns"""
-        try:
-            unique_values = data[col].nunique()
-            
-            if unique_values == 2:
-                # Binary encoding for binary categories
-                le = LabelEncoder()
-                data[f'{col}_encoded'] = le.fit_transform(data[col].fillna('missing'))
-                self.encoders[col] = le
-            elif unique_values < 10:
-                # One-hot encoding for low cardinality
-                dummies = pd.get_dummies(data[col], prefix=col, drop_first=True)
-                data = pd.concat([data, dummies], axis=1)
-            else:
-                # Target encoding or frequency encoding for high cardinality
-                freq_encoding = data[col].value_counts() / len(data)
-                data[f'{col}_freq'] = data[col].map(freq_encoding)
-        except Exception as e:
-            logger.error(f"Error processing categorical column {col}: {str(e)}")
-        
-        return data
-    
-    def _process_text(self, data: pd.DataFrame, col: str) -> pd.DataFrame:
-        """Process text columns"""
-        try:
-            # Basic text features
-            data[f'{col}_length'] = data[col].fillna('').str.len()
-            data[f'{col}_word_count'] = data[col].fillna('').str.split().str.len()
-            
-            # Sentiment or other NLP features could be added here
-        except Exception as e:
-            logger.error(f"Error processing text column {col}: {str(e)}")
-        
-        return data
-
-# src/visualization_engine.py
-"""
-Visualization Engine Module
-Creates interactive visualizations using Plotly
-"""
-
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import pandas as pd
-import numpy as np
-from typing import Dict, List, Any
-import logging
-
-logger = logging.getLogger(__name__)
-
-class VisualizationEngine:
-    """Creates interactive visualizations for analysis results"""
-    
-    def __init__(self):
-        self.color_palette = px.colors.qualitative.Set2
-        self.template = 'plotly_white'
-        
-    def create_visualizations(self, data: pd.DataFrame, 
-                            statistical_results: Dict,
-                            ai_results: Dict) -> Dict:
-        """Create comprehensive visualizations"""
-        visualizations = {'charts': []}
-        
-        # 1. Distribution plots
-        dist_charts = self._create_distribution_plots(data)
-        visualizations['charts'].extend(dist_charts)
-        
-        # 2. Correlation heatmap
-        if 'correlations' in statistical_results:
-            corr_chart = self._create_correlation_heatmap(statistical_results['correlations'])
-            visualizations['charts'].append(corr_chart)
-        
-        # 3. PCA visualization
-        if 'pca_results' in statistical_results:
-            pca_charts = self._create_pca_visualizations(statistical_results['pca_results'])
-            visualizations['charts'].extend(pca_charts)
-        
-        # 4. Time series plots
-        if 'time_series' in statistical_results:
-            ts_charts = self._create_time_series_plots(data, statistical_results['time_series'])
-            visualizations['charts'].extend(ts_charts)
-        
-        # 5. Clustering visualization
-        if 'clustering' in statistical_results:
-            cluster_charts = self._create_clustering_plots(statistical_results['clustering'])
-            visualizations['charts'].extend(cluster_charts)
-        
-        return visualizations
-    
-    def _create_distribution_plots(self, data: pd.DataFrame) -> List:
-        """Create distribution plots for numeric columns"""
-        charts = []
-        numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-        
-        # Create subplot for first 6 numeric columns
-        if len(numeric_cols) > 0:
-            n_cols = min(6, len(numeric_cols))
-            fig = make_subplots(
-                rows=2, cols=3,
-                subplot_titles=[f'Distribution of {col}' for col in numeric_cols[:n_cols]]
-            )
-            
-            for i, col in enumerate(numeric_cols[:n_cols]):
-                row = i // 3 + 1
-                col_pos = i % 3 + 1
-                
-                fig.add_trace(
-                    go.Histogram(x=data[col], name=col, nbinsx=30),
-                    row=row, col=col_pos
-                )
-            
-            fig.update_layout(
-                title_text="Data Distributions",
-                showlegend=False,
-                height=600,
-                template=self.template
-            )
-            
-            charts.append(fig)
-        
-        return charts
-    
-    def _create_correlation_heatmap(self, correlations: Any) -> go.Figure:
-        """Create correlation heatmap"""
-        if isinstance(correlations, dict):
-            # Use Pearson correlations if available
-            corr_matrix = correlations.get('pearson', pd.DataFrame())
-        else:
-            corr_matrix = correlations
-        
-        if not corr_matrix.empty:
-            fig = go.Figure(data=go.Heatmap(
-                z=corr_matrix.values,
-                x=corr_matrix.columns,
-                y=corr_matrix.index,
-                colorscale='RdBu',
-                zmid=0,
-                text=corr_matrix.values.round(2),
-                texttemplate='%{text}',
-                textfont={"size": 10},
-                colorbar=dict(title="Correlation")
-            ))
-            
-            fig.update_layout(
-                title="Correlation Matrix",
-                height=600,
-                template=self.template
-            )
-            
-            return fig
-        
-        return go.Figure()
-    
-    def _create_pca_visualizations(self, pca_results: Dict) -> List:
-        """Create PCA visualizations"""
-        charts = []
-        
-        # Scree plot
-        if 'explained_variance' in pca_results:
-            explained_var = pca_results['explained_variance']
-            cumulative_var = pca_results['cumulative_variance']
-            
-            fig = go.Figure()
-            
-            # Bar chart for explained variance
-            fig.add_trace(go.Bar(
-                x=list(range(1, len(explained_var) + 1)),
-                y=explained_var,
-                name='Explained Variance',
-                marker_color='lightblue'
-            ))
-            
-            # Line chart for cumulative variance
-            fig.add_trace(go.Scatter(
-                x=list(range(1, len(cumulative_var) + 1)),
-                y=cumulative_var,
-                name='Cumulative Variance',
-                mode='lines+markers',
-                yaxis='y2',
-                marker_color='red'
-            ))
-            
-            fig.update_layout(
-                title='PCA Scree Plot',
-                xaxis_title='Principal Component',
-                yaxis_title='Explained Variance Ratio',
-                yaxis2=dict(
-                    title='Cumulative Variance',
-                    overlaying='y',
-                    side='right'
-                ),
-                template=self.template,
-                height=500
-            )
-            
-            charts.append(fig)
-        
-        # Biplot for first two components
-        if 'scores' in pca_results and 'loadings' in pca_results:
-            scores = pd.DataFrame(pca_results['scores'])
-            if 'PC1' in scores.columns and 'PC2' in scores.columns:
-                fig = go.Figure()
-                
-                # Add scores
-                fig.add_trace(go.Scatter(
-                    x=scores['PC1'],
-                    y=scores['PC2'],
-                    mode='markers',
-                    name='Observations',
-                    marker=dict(size=8, color='blue', opacity=0.5)
-                ))
-                
-                fig.update_layout(
-                    title='PCA Biplot',
-                    xaxis_title='First Principal Component',
-                    yaxis_title='Second Principal Component',
-                    template=self.template,
-                    height=500
-                )
-                
-                charts.append(fig)
-        
-        return charts
-    
-    def _create_time_series_plots(self, data: pd.DataFrame, ts_results: Dict) -> List:
-        """Create time series visualizations"""
-        charts = []
-        
-        # Time series plots for each analyzed column
-        for col, results in list(ts_results.items())[:3]:  # Limit to 3 plots
-            if col in data.columns:
-                fig = go.Figure()
-                
-                fig.add_trace(go.Scatter(
-                    x=data.index if isinstance(data.index, pd.DatetimeIndex) else range(len(data)),
-                    y=data[col],
-                    mode='lines',
-                    name=col
-                ))
-                
-                fig.update_layout(
-                    title=f'Time Series: {col}',
-                    xaxis_title='Time',
-                    yaxis_title=col,
-                    template=self.template,
-                    height=400
-                )
-                
-                charts.append(fig)
-        
-        return charts
-    
-    def _create_clustering_plots(self, clustering_results: Dict) -> List:
-        """Create clustering visualizations"""
-        charts = []
-        
-        # Elbow plot for K-means
-        if 'kmeans' in clustering_results:
-            kmeans_data = clustering_results['kmeans']
-            
-            if 'inertias' in kmeans_data and 'silhouette_scores' in kmeans_data:
-                fig = make_subplots(
-                    rows=1, cols=2,
-                    subplot_titles=['Elbow Method', 'Silhouette Score']
-                )
-                
-                # Elbow plot
-                k_values = list(range(2, 2 + len(kmeans_data['inertias'])))
-                fig.add_trace(
-                    go.Scatter(
-                        x=k_values,
-                        y=kmeans_data['inertias'],
-                        mode='lines+markers',
-                        name='Inertia'
-                    ),
-                    row=1, col=1
-                )
-                
-                # Silhouette plot
-                fig.add_trace(
-                    go.Scatter(
-                        x=k_values,
-                        y=kmeans_data['silhouette_scores'],
-                        mode='lines+markers',
-                        name='Silhouette Score'
-                    ),
-                    row=1, col=2
-                )
-                
-                fig.update_xaxes(title_text="Number of Clusters", row=1, col=1)
-                fig.update_xaxes(title_text="Number of Clusters", row=1, col=2)
-                fig.update_yaxes(title_text="Inertia", row=1, col=1)
-                fig.update_yaxes(title_text="Silhouette Score", row=1, col=2)
-                
-                fig.update_layout(
-                    title_text="Clustering Analysis",
-                    template=self.template,
-                    height=400
-                )
-                
-                charts.append(fig)
-        
-        return charts
-
-# src/config.py
-"""
-Configuration Module
-Stores application configuration and model parameters
-"""
-
-from typing import Dict, Any
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-class Config:
-    """Application configuration"""
-    
-    def __init__(self):
-        self.app_config = self._load_app_config()
-        self.model_config = self._load_model_config()
-        self.api_config = self._load_api_config()
-    
-    def _load_app_config(self) -> Dict[str, Any]:
-        """Load application configuration"""
+    def _load_statistical_models(self) -> Dict:
+        """Load configuration for statistical models"""
         return {
-            'app_name': 'AI Data Analysis Tool',
-            'version': '1.0.0',
-            'max_file_size_mb': 500,
-            'supported_file_types': ['csv', 'xlsx', 'xls'],
-            'cache_enabled': True,
-            'cache_ttl': 3600,  # seconds
-            'max_rows_display': 100,
-            'max_columns_display': 50,
-            'sampling_threshold': 10000,
-            'timeout_seconds': 300,
-            'max_concurrent_requests': 5
-        }
-    
-    def _load_model_config(self) -> Dict[str, Any]:
-        """Load model configuration"""
-        return {
-            'pca': {
-                'max_components': 10,
-                'variance_threshold': 0.95,
-                'kaiser_criterion': True
-            },
-            'clustering': {
-                'min_clusters': 2,
-                'max_clusters': 10,
-                'methods': ['kmeans', 'dbscan', 'hierarchical']
+            'descriptive': {
+                'name': 'Descriptive Statistics',
+                'description': 'Basic statistical measures including mean, median, mode, variance, skewness, kurtosis',
+                'methods': ['mean', 'median', 'mode', 'std', 'var', 'skew', 'kurt', 'quantiles']
             },
             'correlation': {
-                'methods': ['pearson', 'spearman', 'kendall'],
-                'significance_threshold': 0.05,
-                'strength_threshold': 0.5
+                'name': 'Correlation Analysis',
+                'description': 'Pearson, Spearman, and Kendall correlation coefficients with significance testing',
+                'methods': ['pearson', 'spearman', 'kendall', 'partial_correlation', 'distance_correlation']
             },
-            'outlier_detection': {
-                'methods': ['iqr', 'zscore', 'isolation_forest'],
-                'contamination': 0.1,
-                'iqr_multiplier': 1.5,
-                'zscore_threshold': 3
+            'pca': {
+                'name': 'Principal Component Analysis',
+                'description': 'Dimensionality reduction using PCA with Kaiser criterion and scree plot analysis',
+                'methods': ['standard_pca', 'kernel_pca', 'incremental_pca', 'sparse_pca']
+            },
+            'famd': {
+                'name': 'Factor Analysis of Mixed Data',
+                'description': 'Handles both numerical and categorical variables for factor analysis',
+                'methods': ['famd', 'mca', 'ca', 'mfa']
+            },
+            'clustering': {
+                'name': 'Clustering Analysis',
+                'description': 'K-means, DBSCAN, and hierarchical clustering with optimal cluster detection',
+                'methods': ['kmeans', 'dbscan', 'hierarchical', 'gaussian_mixture']
             },
             'time_series': {
-                'seasonality_period': 12,
-                'trend_methods': ['linear', 'polynomial', 'exponential'],
-                'forecast_periods': 12
-            }
-        }
-    
-    def _load_api_config(self) -> Dict[str, Any]:
-        """Load API configuration"""
-        return {
-            'openai': {
-                'models': ['gpt-4-turbo-preview', 'gpt-4', 'gpt-3.5-turbo-16k'],
-                'max_tokens': 4000,
-                'temperature_range': (0.0, 1.0),
-                'default_temperature': 0.5,
-                'rate_limit': 60,  # requests per minute
-                'timeout': 60  # seconds
+                'name': 'Time Series Analysis',
+                'description': 'Trend analysis, seasonality detection, and stationarity testing',
+                'methods': ['decomposition', 'stationarity_test', 'autocorrelation', 'trend_analysis']
             },
-            'claude': {
-                'models': ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'],
-                'max_tokens': 4000,
-                'temperature_range': (0.0, 1.0),
-                'default_temperature': 0.5,
-                'rate_limit': 60,
-                'timeout': 60
+            'distribution': {
+                'name': 'Distribution Analysis',
+                'description': 'Normality tests, distribution fitting, and Q-Q plots',
+                'methods': ['normality_tests', 'distribution_fitting', 'outlier_detection']
+            },
+            'hypothesis': {
+                'name': 'Hypothesis Testing',
+                'description': 'T-tests, ANOVA, chi-square tests, and non-parametric alternatives',
+                'methods': ['t_test', 'anova', 'chi_square', 'mann_whitney', 'kruskal_wallis']
             }
         }
     
-    def get(self, section: str, key: str, default: Any = None) -> Any:
-        """Get configuration value"""
-        config_section = getattr(self, f'{section}_config', {})
-        return config_section.get(key, default)
-
-# src/utils.py
-"""
-Utilities Module
-Helper functions and utilities
-"""
-
-import pandas as pd
-import numpy as np
-import hashlib
-import json
-from typing import Any, List, Dict, Optional, Union
-import asyncio
-from functools import wraps
-import time
-import logging
-import openai
-from anthropic import Anthropic
-
-logger = logging.getLogger(__name__)
-
-def validate_api_key(api_key: str, provider: str) -> bool:
-    """Validate API key by making a test request"""
-    try:
-        if provider == 'openai':
-            openai.api_key = api_key
-            # Test with a minimal request
-            openai.Model.list()
-            return True
-        elif provider == 'claude':
-            client = Anthropic(api_key=api_key)
-            # Test with a minimal request
-            client.messages.create(
-                model="claude-3-haiku-20240307",
-                max_tokens=10,
-                messages=[{"role": "user", "content": "test"}]
-            )
-            return True
-    except Exception as e:
-        logger.error(f"API key validation failed for {provider}: {str(e)}")
-        return False
-    
-    return False
-
-def chunk_data(data: pd.DataFrame, chunk_size: int = 1000) -> List[pd.DataFrame]:
-    """Split DataFrame into chunks for processing"""
-    chunks = []
-    for i in range(0, len(data), chunk_size):
-        chunks.append(data.iloc[i:i+chunk_size])
-    return chunks
-
-def safe_process(func):
-    """Decorator for safe processing with error handling"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            logger.error(f"Error in {func.__name__}: {str(e)}")
-            return None
-    return wrapper
-
-def calculate_hash(data: Union[str, bytes, pd.DataFrame]) -> str:
-    """Calculate hash for caching"""
-    if isinstance(data, pd.DataFrame):
-        data = data.to_json()
-    elif not isinstance(data, (str, bytes)):
-        data = json.dumps(data, sort_keys=True, default=str)
-    
-    if isinstance(data, str):
-        data = data.encode('utf-8')
-    
-    return hashlib.sha256(data).hexdigest()
-
-def format_number(value: float, precision: int = 2) -> str:
-    """Format number for display"""
-    if abs(value) >= 1e6:
-        return f"{value/1e6:.{precision}f}M"
-    elif abs(value) >= 1e3:
-        return f"{value/1e3:.{precision}f}K"
-    else:
-        return f"{value:.{precision}f}"
-
-def detect_column_type(series: pd.Series) -> str:
-    """Detect the type of a pandas Series"""
-    if pd.api.types.is_numeric_dtype(series):
-        if pd.api.types.is_integer_dtype(series):
-            return 'integer'
-        else:
-            return 'float'
-    elif pd.api.types.is_datetime64_any_dtype(series):
-        return 'datetime'
-    elif pd.api.types.is_categorical_dtype(series):
-        return 'categorical'
-    elif pd.api.types.is_bool_dtype(series):
-        return 'boolean'
-    else:
-        # Check if it might be a date string
-        try:
-            pd.to_datetime(series.dropna().iloc[:10])
-            return 'datetime_string'
-        except:
-            pass
+    def analyze(self, data: pd.DataFrame, params: Dict) -> Dict:
+        """Perform comprehensive statistical analysis"""
+        results = {}
         
-        # Check if categorical based on unique values
-        unique_ratio = series.nunique() / len(series)
-        if unique_ratio < 0.05:  # Less than 5% unique values
-            return 'categorical'
-        else:
-            return 'text'
-
-def create_summary_statistics(data: pd.DataFrame) -> Dict[str, Any]:
-    """Create summary statistics for a DataFrame"""
-    summary = {
-        'shape': data.shape,
-        'columns': list(data.columns),
-        'dtypes': data.dtypes.value_counts().to_dict(),
-        'memory_usage': data.memory_usage(deep=True).sum() / 1024**2,  # in MB
-        'null_counts': data.isnull().sum().to_dict(),
-        'duplicate_rows': data.duplicated().sum()
-    }
+        # Get requested analysis types
+        analysis_types = params.get('analysis_types', ['Descriptive Statistics', 'Correlation Analysis'])
+        advanced_analysis = params.get('advanced_analysis', [])
+        
+        # Separate numeric and categorical columns
+        numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
+        categorical_cols = data.select_dtypes(include=['object', 'category']).columns.tolist()
+        
+        # 1. Descriptive Statistics
+        if 'Descriptive Statistics' in analysis_types:
+            results['descriptive'] = self._descriptive_statistics(data, numeric_cols, categorical_cols)
+        
+        # 2. Correlation Analysis
+        if 'Correlation Analysis' in analysis_types and len(numeric_cols) > 1:
+            results['correlations'] = self._correlation_analysis(data[numeric_cols])
+        
+        # 3. Distribution Analysis
+        if 'Distribution Analysis' in analysis_types:
+            results['distributions'] = self._distribution_analysis(data, numeric_cols)
+        
+        # 4. Outlier Detection
+        if 'Outlier Detection' in analysis_types:
+            results['outliers'] = self._outlier_detection(data, numeric_cols)
+        
+        # 5. Time Series Analysis
+        if 'Time Series Analysis' in analysis_types:
+            results['time_series'] = self._time_series_analysis(data, params)
+        
+        # 6. PCA Analysis
+        if 'PCA (Principal Component Analysis)' in advanced_analysis and len(numeric_cols) > 2:
+            results['pca_results'] = self._pca_analysis(data[numeric_cols])
+        
+        # 7. FAMD Analysis
+        if 'FAMD (Factor Analysis of Mixed Data)' in advanced_analysis:
+            if len(numeric_cols) > 0 and len(categorical_cols) > 0:
+                results['famd_results'] = self._famd_analysis(data, numeric_cols, categorical_cols)
+        
+        # 8. Clustering Analysis
+        if 'Clustering Analysis' in advanced_analysis and len(numeric_cols) > 1:
+            results['clustering'] = self._clustering_analysis(data[numeric_cols])
+        
+        # 9. Hypothesis Testing
+        if 'Hypothesis Testing' in analysis_types:
+            results['hypothesis_tests'] = self._hypothesis_testing(data, numeric_cols, categorical_cols, params)
+        
+        # 10. Feature Importance
+        if 'Regression Analysis' in advanced_analysis:
+            results['feature_importance'] = self._feature_importance(data, numeric_cols, params)
+        
+        return results
     
-    # Add statistics for numeric columns
-    numeric_cols = data.select_dtypes(include=[np.number]).columns
-    if len(numeric_cols) > 0:
-        summary['numeric_summary'] = data[numeric_cols].describe().to_dict()
+    def _descriptive_statistics(self, data: pd.DataFrame, 
+                               numeric_cols: List[str], 
+                               categorical_cols: List[str]) -> pd.DataFrame:
+        """Calculate comprehensive descriptive statistics"""
+        stats_dict = {}
+        
+        # Numeric columns statistics
+        if numeric_cols:
+            numeric_stats = data[numeric_cols].describe(percentiles=[.01, .05, .25, .5, .75, .95, .99])
+            
+            # Add additional statistics
+            numeric_stats.loc['variance'] = data[numeric_cols].var()
+            numeric_stats.loc['skewness'] = data[numeric_cols].skew()
+            numeric_stats.loc['kurtosis'] = data[numeric_cols].kurtosis()
+            numeric_stats.loc['iqr'] = numeric_stats.loc['75%'] - numeric_stats.loc['25%']
+            numeric_stats.loc['cv'] = (numeric_stats.loc['std'] / numeric_stats.loc['mean']).abs()  # Coefficient of variation
+            numeric_stats.loc['range'] = numeric_stats.loc['max'] - numeric_stats.loc['min']
+            numeric_stats.loc['nulls'] = data[numeric_cols].isnull().sum()
+            numeric_stats.loc['null_pct'] = (data[numeric_cols].isnull().sum() / len(data)) * 100
+            
+            stats_dict.update(numeric_stats.to_dict())
+        
+        # Categorical columns statistics
+        if categorical_cols:
+            cat_stats = {}
+            for col in categorical_cols:
+                cat_stats[col] = {
+                    'unique_count': data[col].nunique(),
+                    'mode': data[col].mode().iloc[0] if not data[col].mode().empty else None,
+                    'mode_freq': data[col].value_counts().iloc[0] if not data[col].value_counts().empty else 0,
+                    'mode_pct': (data[col].value_counts().iloc[0] / len(data) * 100) if not data[col].value_counts().empty else 0,
+                    'entropy': stats.entropy(data[col].value_counts()),
+                    'nulls': data[col].isnull().sum(),
+                    'null_pct': (data[col].isnull().sum() / len(data)) * 100
+                }
+            
+            cat_stats_df = pd.DataFrame(cat_stats)
+            stats_dict.update(cat_stats_df.to_dict())
+        
+        return pd.DataFrame(stats_dict)
     
-    # Add statistics for categorical columns
-    categorical_cols = data.select_dtypes(include=['object', 'category']).columns
-    if len(categorical_cols) > 0:
-        cat_summary = {}
-        for col in categorical_cols[:10]:  # Limit to first 10
-            cat_summary[col] = {
-                'unique': data[col].nunique(),
-                'top': data[col].mode().iloc[0] if not data[col].mode().empty else None,
-                'freq': data[col].value_counts().iloc[0] if not data[col].value_counts().empty else 0
+    def _correlation_analysis(self, data: pd.DataFrame) -> Dict:
+        """Perform comprehensive correlation analysis"""
+        results = {}
+        
+        # Pearson correlation
+        results['pearson'] = data.corr(method='pearson')
+        
+        # Spearman correlation
+        results['spearman'] = data.corr(method='spearman')
+        
+        # Kendall correlation for smaller datasets
+        if len(data) < 1000:
+            results['kendall'] = data.corr(method='kendall')
+        
+        # Find significant correlations
+        corr_matrix = results['pearson']
+        significant_corrs = []
+        
+        for i in range(len(corr_matrix.columns)):
+            for j in range(i+1, len(corr_matrix.columns)):
+                col1 = corr_matrix.columns[i]
+                col2 = corr_matrix.columns[j]
+                corr_value = corr_matrix.iloc[i, j]
+                
+                if abs(corr_value) > 0.5:  # Strong correlation threshold
+                    # Calculate p-value
+                    _, p_value = pearsonr(data[col1].dropna(), data[col2].dropna())
+                    
+                    significant_corrs.append({
+                        'var1': col1,
+                        'var2': col2,
+                        'correlation': corr_value,
+                        'p_value': p_value,
+                        'strength': 'Strong' if abs(corr_value) > 0.7 else 'Moderate'
+                    })
+        
+        results['significant_correlations'] = significant_corrs
+        
+        # Correlation with target variable if specified
+        target_correlations = {}
+        for col in data.columns:
+            if col != data.columns[-1]:  # Assuming last column might be target
+                target_correlations[col] = {
+                    'pearson': pearsonr(data[col].dropna(), data.iloc[:, -1].dropna())[0],
+                    'spearman': spearmanr(data[col].dropna(), data.iloc[:, -1].dropna())[0]
+                }
+        
+        results['target_correlations'] = target_correlations
+        
+        return results
+    
+    def _distribution_analysis(self, data: pd.DataFrame, numeric_cols: List[str]) -> Dict:
+        """Analyze distributions of numeric variables"""
+        results = {}
+        
+        for col in numeric_cols:
+            col_data = data[col].dropna()
+            
+            if len(col_data) > 20:  # Need sufficient data for tests
+                col_results = {}
+                
+                # Normality tests
+                if len(col_data) < 5000:
+                    shapiro_stat, shapiro_p = shapiro(col_data)
+                    col_results['shapiro'] = {'statistic': shapiro_stat, 'p_value': shapiro_p}
+                
+                # Anderson-Darling test
+                anderson_result = anderson(col_data)
+                col_results['anderson'] = {
+                    'statistic': anderson_result.statistic,
+                    'critical_values': anderson_result.critical_values.tolist(),
+                    'significance_levels': anderson_result.significance_level.tolist()
+                }
+                
+                # Kolmogorov-Smirnov test
+                ks_stat, ks_p = kstest(col_data, 'norm', args=(col_data.mean(), col_data.std()))
+                col_results['ks_test'] = {'statistic': ks_stat, 'p_value': ks_p}
+                
+                # Distribution characteristics
+                col_results['characteristics'] = {
+                    'mean': col_data.mean(),
+                    'median': col_data.median(),
+                    'skewness': col_data.skew(),
+                    'kurtosis': col_data.kurtosis(),
+                    'is_normal': shapiro_p > 0.05 if len(col_data) < 5000 else ks_p > 0.05,
+                    'is_symmetric': abs(col_data.skew()) < 0.5,
+                    'has_outliers': self._detect_outliers_iqr(col_data).any()
+                }
+                
+                results[col] = col_results
+        
+        return results
+    
+    def _outlier_detection(self, data: pd.DataFrame, numeric_cols: List[str]) -> Dict:
+        """Detect outliers using multiple methods"""
+        results = {}
+        
+        # IQR method
+        iqr_outliers = {}
+        for col in numeric_cols:
+            outliers_mask = self._detect_outliers_iqr(data[col])
+            outlier_indices = data.index[outliers_mask].tolist()
+            iqr_outliers[col] = {
+                'count': len(outlier_indices),
+                'percentage': (len(outlier_indices) / len(data)) * 100,
+                'indices': outlier_indices[:10]  # Limit to first 10 for display
             }
-        summary['categorical_summary'] = cat_summary
+        
+        results['iqr_method'] = iqr_outliers
+        
+        # Z-score method
+        zscore_outliers = {}
+        for col in numeric_cols:
+            z_scores = np.abs(stats.zscore(data[col].dropna()))
+            outliers_mask = z_scores > 3
+            outlier_indices = data[col].dropna().index[outliers_mask].tolist()
+            zscore_outliers[col] = {
+                'count': len(outlier_indices),
+                'percentage': (len(outlier_indices) / len(data[col].dropna())) * 100,
+                'indices': outlier_indices[:10]
+            }
+        
+        results['zscore_method'] = zscore_outliers
+        
+        # Isolation Forest for multivariate outlier detection
+        if len(numeric_cols) > 1:
+            iso_forest = IsolationForest(contamination=0.1, random_state=42)
+            outlier_predictions = iso_forest.fit_predict(data[numeric_cols].dropna())
+            outlier_mask = outlier_predictions == -1
+            
+            results['isolation_forest'] = {
+                'total_outliers': outlier_mask.sum(),
+                'percentage': (outlier_mask.sum() / len(outlier_mask)) * 100,
+                'outlier_scores': iso_forest.score_samples(data[numeric_cols].dropna()).tolist()[:100]
+            }
+        
+        return results
     
-    return summary
-
-class RateLimiter:
-    """Rate limiter for API calls"""
+    def _detect_outliers_iqr(self, series: pd.Series) -> pd.Series:
+        """Detect outliers using IQR method"""
+        Q1 = series.quantile(0.25)
+        Q3 = series.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        return (series < lower_bound) | (series > upper_bound)
     
-    def __init__(self, max_calls: int, time_window: int):
-        self.max_calls = max_calls
-        self.time_window = time_window
-        self.calls = []
-    
-    async def acquire(self):
-        """Acquire permission to make a call"""
-        now = time.time()
-        # Remove old calls outside the time window
-        self.calls = [call_time for call_time in self.calls 
-                     if now - call_time < self.time_window]
+    def _time_series_analysis(self, data: pd.DataFrame, params: Dict) -> Dict:
+        """Perform time series analysis if datetime column exists"""
+        results = {}
         
-        if len(self.calls) >= self.max_calls:
-            # Wait until the oldest call expires
-            sleep_time = self.time_window - (now - self.calls[0]) + 0.1
-            await asyncio.sleep(sleep_time)
-            await self.acquire()  # Retry
-        else:
-            self.calls.append(now)
-
-class DataValidator:
-    """Validate data quality and integrity"""
-    
-    @staticmethod
-    def validate_dataframe(df: pd.DataFrame) -> Dict[str, Any]:
-        """Validate a DataFrame and return issues"""
-        issues = {
-            'warnings': [],
-            'errors': [],
-            'info': []
-        }
-        
-        # Check for empty DataFrame
-        if df.empty:
-            issues['errors'].append("DataFrame is empty")
-            return issues
-        
-        # Check for duplicate columns
-        duplicate_cols = df.columns[df.columns.duplicated()].tolist()
-        if duplicate_cols:
-            issues['errors'].append(f"Duplicate columns found: {duplicate_cols}")
-        
-        # Check for high percentage of missing values
-        missing_pct = df.isnull().sum() / len(df)
-        high_missing = missing_pct[missing_pct > 0.5]
-        if len(high_missing) > 0:
-            issues['warnings'].append(
-                f"Columns with >50% missing values: {high_missing.index.tolist()}"
-            )
-        
-        # Check for constant columns
-        constant_cols = [col for col in df.columns 
-                        if df[col].nunique() == 1]
-        if constant_cols:
-            issues['info'].append(f"Constant columns: {constant_cols}")
-        
-        # Check for mixed data types
-        for col in df.columns:
-            if df[col].dtype == 'object':
+        # Find datetime columns
+        date_cols = []
+        for col in data.columns:
+            if pd.api.types.is_datetime64_any_dtype(data[col]):
+                date_cols.append(col)
+            else:
+                # Try to parse as datetime
                 try:
-                    pd.to_numeric(df[col], errors='raise')
-                    issues['info'].append(
-                        f"Column '{col}' contains numeric values but stored as text"
-                    )
+                    pd.to_datetime(data[col], errors='coerce')
+                    if data[col].notna().sum() > len(data) * 0.5:  # At least 50% valid dates
+                        date_cols.append(col)
                 except:
                     pass
         
-        return issues
+        if not date_cols:
+            return {'message': 'No datetime columns found for time series analysis'}
+        
+        # Use first date column
+        date_col = date_cols[0]
+        data['_datetime'] = pd.to_datetime(data[date_col], errors='coerce')
+        data_ts = data.dropna(subset=['_datetime']).set_index('_datetime').sort_index()
+        
+        # Analyze numeric columns over time
+        numeric_cols = data_ts.select_dtypes(include=[np.number]).columns.tolist()
+        
+        for col in numeric_cols[:5]:  # Limit to first 5 numeric columns
+            col_results = {}
+            
+            # Resample to appropriate frequency
+            if len(data_ts) > 365:
+                ts_data = data_ts[col].resample('D').mean()
+            elif len(data_ts) > 52:
+                ts_data = data_ts[col].resample('W').mean()
+            else:
+                ts_data = data_ts[col]
+            
+            ts_data = ts_data.dropna()
+            
+            if len(ts_data) > 10:
+                # Stationarity test
+                adf_result = adfuller(ts_data)
+                col_results['stationarity'] = {
+                    'adf_statistic': adf_result[0],
+                    'p_value': adf_result[1],
+                    'is_stationary': adf_result[1] < 0.05
+                }
+                
+                # Seasonal decomposition (if enough data)
+                if len(ts_data) > 2 * 12:  # At least 2 years of monthly data
+                    try:
+                        decomposition = seasonal_decompose(ts_data, model='additive', period=12)
+                        col_results['seasonality'] = {
+                            'seasonal_strength': decomposition.seasonal.std(),
+                            'trend_strength': decomposition.trend.dropna().std(),
+                            'has_seasonality': decomposition.seasonal.std() > decomposition.resid.dropna().std()
+                        }
+                    except:
+                        pass
+                
+                # Autocorrelation
+                try:
+                    acf_values = acf(ts_data, nlags=min(40, len(ts_data)//4))
+                    col_results['autocorrelation'] = {
+                        'lag_1': acf_values[1] if len(acf_values) > 1 else None,
+                        'significant_lags': [i for i, val in enumerate(acf_values[1:], 1) 
+                                           if abs(val) > 2/np.sqrt(len(ts_data))][:10]
+                    }
+                except:
+                    pass
+            
+            results[col] = col_results
+        
+        return results
+    
+    def _pca_analysis(self, data: pd.DataFrame) -> Dict:
+        """Perform Principal Component Analysis"""
+        # Standardize the data
+        scaler = StandardScaler()
+        data_scaled = scaler.fit_transform(data.dropna())
+        
+        # Perform PCA
+        pca = PCA()
+        pca_result = pca.fit_transform(data_scaled)
+        
+        # Calculate results
+        results = {
+            'explained_variance': pca.explained_variance_ratio_.tolist(),
+            'cumulative_variance': np.cumsum(pca.explained_variance_ratio_).tolist(),
+            'n_components_95': np.argmax(np.cumsum(pca.explained_variance_ratio_) >= 0.95) + 1,
+            'kaiser_criterion': sum(pca.explained_variance_ > 1),  # Components with eigenvalue > 1
+            'loadings': pd.DataFrame(
+                pca.components_[:5].T,  # First 5 components
+                columns=[f'PC{i+1}' for i in range(min(5, len(pca.components_)))],
+                index=data.columns
+            ).to_dict(),
+            'scores': pd.DataFrame(
+                pca_result[:, :3],  # First 3 components
+                columns=[f'PC{i+1}' for i in range(min(3, pca_result.shape[1]))]
+            ).head(100).to_dict()  # First 100 observations
+        }
+        
+        return results
+    
+    def _famd_analysis(self, data: pd.DataFrame, 
+                      numeric_cols: List[str], 
+                      categorical_cols: List[str]) -> Dict:
+        """Perform Factor Analysis of Mixed Data"""
+        try:
+            # Prepare data
+            data_clean = data[numeric_cols + categorical_cols].dropna()
+            
+            # Initialize FAMD
+            famd = prince.FAMD(
+                n_components=min(10, len(numeric_cols) + len(categorical_cols)),
+                n_iter=3,
+                random_state=42
+            )
+            
+            # Fit FAMD
+            famd.fit(data_clean)
+            
+            # Transform data
+            famd_coords = famd.transform(data_clean)
+            
+            # Results
+            results = {
+                'explained_inertia': famd.explained_inertia_.tolist(),
+                'cumulative_inertia': np.cumsum(famd.explained_inertia_).tolist(),
+                'row_coordinates': famd_coords.iloc[:100, :3].to_dict(),  # First 100 rows, 3 components
+                'column_correlations': famd.column_correlations(data_clean).iloc[:, :3].to_dict(),
+                'contribution_numeric': {},
+                'contribution_categorical': {}
+            }
+            
+            # Variable contributions
+            for i, col in enumerate(numeric_cols):
+                if i < 3:  # First 3 numeric variables
+                    results['contribution_numeric'][col] = famd.column_correlations(data_clean).loc[col, :3].tolist()
+            
+            return results
+            
+        except Exception as e:
+            return {'error': f'FAMD analysis failed: {str(e)}'}
+    
+    def _clustering_analysis(self, data: pd.DataFrame) -> Dict:
+        """Perform clustering analysis"""
+        results = {}
+        
+        # Prepare data
+        scaler = StandardScaler()
+        data_scaled = scaler.fit_transform(data.dropna())
+        
+        # Determine optimal number of clusters using elbow method
+        inertias = []
+        silhouette_scores = []
+        K_range = range(2, min(11, len(data_scaled)))
+        
+        for k in K_range:
+            kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+            kmeans.fit(data_scaled)
+            inertias.append(kmeans.inertia_)
+            
+            from sklearn.metrics import silhouette_score
+            if k < len(data_scaled):
+                score = silhouette_score(data_scaled, kmeans.labels_)
+                silhouette_scores.append(score)
+        
+        # Find optimal k using silhouette score
+        optimal_k = K_range[np.argmax(silhouette_scores)]
+        
+        # Perform K-means with optimal k
+        kmeans_final = KMeans(n_clusters=optimal_k, random_state=42, n_init=10)
+        kmeans_labels = kmeans_final.fit_predict(data_scaled)
+        
+        results['kmeans'] = {
+            'optimal_k': optimal_k,
+            'inertias': inertias,
+            'silhouette_scores': silhouette_scores,
+            'cluster_sizes': pd.Series(kmeans_labels).value_counts().to_dict(),
+            'cluster_centers': pd.DataFrame(
+                scaler.inverse_transform(kmeans_final.cluster_centers_),
+                columns=data.columns
+            ).to_dict()
+        }
+        
+        # DBSCAN clustering
+        dbscan = DBSCAN(eps=0.5, min_samples=5)
+        dbscan_labels = dbscan.fit_predict(data_scaled)
+        
+        results['dbscan'] = {
+            'n_clusters': len(set(dbscan_labels)) - (1 if -1 in dbscan_labels else 0),
+            'n_outliers': list(dbscan_labels).count(-1),
+            'cluster_sizes': pd.Series(dbscan_labels)[dbscan_labels != -1].value_counts().to_dict()
+        }
+        
+        return results
+    
+    def _hypothesis_testing(self, data: pd.DataFrame, 
+                           numeric_cols: List[str], 
+                           categorical_cols: List[str],
+                           params: Dict) -> Dict:
+        """Perform various hypothesis tests"""
+        results = {}
+        confidence_level = params.get('confidence_level', 0.95)
+        alpha = 1 - confidence_level
+        
+        # Test for normality in numeric columns
+        normality_tests = {}
+        for col in numeric_cols[:10]:  # Limit to first 10 columns
+            col_data = data[col].dropna()
+            if len(col_data) > 20:
+                if len(col_data) < 5000:
+                    stat, p_value = shapiro(col_data)
+                    test_name = 'Shapiro-Wilk'
+                else:
+                    stat, p_value = normaltest(col_data)
+                    test_name = 'D\'Agostino-Pearson'
+                
+                normality_tests[col] = {
+                    'test': test_name,
+                    'statistic': stat,
+                    'p_value': p_value,
+                    'is_normal': p_value > alpha,
+                    'conclusion': 'Normal' if p_value > alpha else 'Not Normal'
+                }
+        
+        results['normality_tests'] = normality_tests
+        
+        # T-tests between pairs of numeric columns
+        if len(numeric_cols) >= 2:
+            t_tests = []
+            for i in range(min(3, len(numeric_cols)-1)):
+                for j in range(i+1, min(4, len(numeric_cols))):
+                    col1, col2 = numeric_cols[i], numeric_cols[j]
+                    data1 = data[col1].dropna()
+                    data2 = data[col2].dropna()
+                    
+                    # Check if normal for parametric test
+                    if normality_tests.get(col1, {}).get('is_normal') and normality_tests.get(col2, {}).get('is_normal'):
+                        t_stat, p_value = stats.ttest_ind(data1, data2)
+                        test_type = 'Independent T-test'
+                    else:
+                        t_stat, p_value = stats.mannwhitneyu(data1, data2, alternative='two-sided')
+                        test_type = 'Mann-Whitney U test'
+                    
+                    t_tests.append({
+                        'var1': col1,
+                        'var2': col2,
+                        'test_type': test_type,
+                        'statistic': t_stat,
+                        'p_value': p_value,
+                        'significant': p_value < alpha,
+                        'effect_size': (data1.mean() - data2.mean()) / np.sqrt((data1.var() + data2.var()) / 2)
+                    })
+            
+            results['comparison_tests'] = t_tests
+        
+        # ANOVA for categorical vs numeric
+        if categorical_cols and numeric_cols:
+            anova_results = []
+            for cat_col in categorical_cols[:3]:  # Limit to first 3 categorical
+                for num_col in numeric_cols[:3]:  # Limit to first 3 numeric
+                    groups = []
+                    categories = data[cat_col].dropna().unique()
+                    
+                    if 2 <= len(categories) <= 10:  # Reasonable number of groups
+                        for category in categories:
+                            group_data = data[data[cat_col] == category][num_col].dropna()
+                            if len(group_data) > 5:
+                                groups.append(group_data)
+                        
+                        if len(groups) >= 2:
+                            f_stat, p_value = stats.f_oneway(*groups)
+                            
+                            anova_results.append({
+                                'categorical': cat_col,
+                                'numeric': num_col,
+                                'f_statistic': f_stat,
+                                'p_value': p_value,
+                                'significant': p_value < alpha,
+                                'n_groups': len(groups),
+                                'conclusion': 'Groups differ' if p_value < alpha else 'No difference'
+                            })
+            
+            results['anova_tests'] = anova_results
+        
+        return results
+    
+    def _feature_importance(self, data: pd.DataFrame, 
+                           numeric_cols: List[str], 
+                           params: Dict) -> Dict:
+        """Calculate feature importance using mutual information"""
+        results = {}
+        
+        # Assume last numeric column is target
+        if len(numeric_cols) > 1:
+            X = data[numeric_cols[:-1]].dropna()
+            y = data[numeric_cols[-1]].dropna()
+            
+            # Align X and y
+            common_index = X.index.intersection(y.index)
+            X = X.loc[common_index]
+            y = y.loc[common_index]
+            
+            # Calculate mutual information
+            mi_scores = mutual_info_regression(X, y, random_state=42)
+            
+            # Create importance ranking
+            importance_df = pd.DataFrame({
+                'feature': X.columns,
+                'importance': mi_scores,
+                'normalized_importance': mi_scores / mi_scores.max() if mi_scores.max() > 0 else mi_scores
+            }).sort_values('importance', ascending=False)
+            
+            results['mutual_information'] = importance_df.to_dict()
+            
+            # Correlation-based importance
+            correlations = []
+            for col in X.columns:
+                corr, p_value = pearsonr(X[col], y)
+                correlations.append({
+                    'feature': col,
+                    'correlation': abs(corr),
+                    'p_value': p_value
+                })
+            
+            results['correlation_importance'] = sorted(correlations, 
+                                                      key=lambda x: x['correlation'], 
+                                                      reverse=True)
+        
+        return results
