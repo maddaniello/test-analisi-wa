@@ -116,7 +116,9 @@ class AIDataAnalysisApp:
             status = "✅ Ready" if st.session_state.data is not None else "⏳ Waiting"
             st.metric("Data Status", status)
         with col2:
-            api_status = "✅ Connected" if st.session_state.api_keys else "❌ Not Connected"
+            openai_status = "✅" if st.session_state.api_keys.get('openai') else "❌"
+            claude_status = "✅" if st.session_state.api_keys.get('claude') else "❌"
+            api_status = f"OpenAI {openai_status} | Claude {claude_status}"
             st.metric("AI APIs", api_status)
         with col3:
             rows = len(st.session_state.data) if st.session_state.data is not None else 0
