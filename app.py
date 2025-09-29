@@ -569,80 +569,188 @@ This dataset contains e-commerce sales data from 2023. I want to:
                 
                 if 'descriptive' in results['statistical']:
                     st.markdown("### Descriptive Statistics")
-                    st.dataframe(
-                        results['statistical']['descriptive'],
-                        use_container_width=True
-                    )
+                    desc_stats = results['statistical']['descriptive']
+                    if isinstance(desc_stats, pd.DataFrame):
+                        st.dataframe(desc_stats, use_container_width=True)
+                    else:
+                        st.json(desc_stats)
                 
                 if 'correlations' in results['statistical']:
                     st.markdown("### Correlation Matrix")
-                    fig = px.imshow(
-                        results['statistical']['correlations'],
-                        labels=dict(color="Correlation"),
-                        color_continuous_scale="RdBu",
-                        aspect="auto"
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                    corr_data = results['statistical']['correlations']
+                    
+                    # Handle different correlation data formats
+                    if isinstance(corr_data, dict):
+                        # If it's a dict with different correlation types
+                        if 'pearson' in corr_data:
+                            corr_matrix = corr_data['pearson']
+                        elif 'spearman' in corr_data:
+                            corr_matrix = corr_data['spearman']
+                        else:
+                            corr_matrix = None
+                            st.warning("Correlation data format not recognized")
+                    else:
+                        corr_matrix = corr_data
+                    
+                    # Display correlation matrix if available
+                    if corr_matrix is not None and isinstance(corr_matrix, pd.DataFrame) and not corr_matrix.empty:
+                        try:
+                            fig = px.imshow(
+                                corr_matrix.values,
+                                labels=dict(x="Variables", y="Variables", color="Correlation"),
+                                x=corr_matrix.columns.tolist(),
+                                y=corr_matrix.index.tolist(),
+                                color_continuous_scale="RdBu",
+                                zmin=-1,
+                                zmax=1,
+                                aspect="auto"
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Could not display correlation heatmap: {str(e)}")
+                            st.dataframe(corr_matrix, use_container_width=True)
+                    
+                    # Show significant correlations if available
+                    if isinstance(corr_data, dict) and 'significant_correlations' in corr_data:
+                        st.markdown("#### Significant Correlations")
+                        sig_corrs = corr_data['significant_correlations']
+                        if sig_corrs:
+                            for corr in sig_corrs[:10]:  # Show top 10
+                                col1, col2, col3 = st.columns([2, 1, 1])
+                                with col1:
+                                    st.write(f"{corr['var1']} ↔ {corr['var2']}")
+                                with col2:
+                                    st.write(f"r = {corr['correlation']:.3f}")
+                                with col3:
+                                    st.write(f"{corr['strength']}")
                 
                 if 'pca_results' in results['statistical']:
                     st.markdown("### PCA Results")
                     pca_data = results['statistical']['pca_results']
                     
-                    # Explained variance
-                    fig = px.bar(
-                        x=list(range(1, len(pca_data['explained_variance']) + 1)),
-                        y=pca_data['explained_variance'],
-                        labels={'x': 'Component', 'y': 'Explained Variance'},
-                        title="PCA: Explained Variance by Component"
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                    if 'explained_variance' in pca_data:
+                        # Explained variance plot
+                        try:
+                            explained_var = pca_data['explained_variance']
+                            fig = px.bar(
+                                x=list(range(1, len(explained_var) + 1)),
+                                y=explained_var,
+                                labels={'x': 'Component', 'y': 'Explained Variance'},
+                                title="PCA: Explained Variance by Component"
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Could not display PCA plot: {str(e)}")
                     
                     # Component loadings
-                    st.markdown("#### Component Loadings")
-                    st.dataframe(pca_data['loadings'], use_container_width=True)
+                    if 'loadings' in pca_data:
+                        st.markdown("#### Component Loadings")
+                        loadings = pca_data['loadings']
+                        if isinstance(loadings, dict):
+                            st.json(loadings)
+                        else:
+                            st.dataframe(loadings, use_container_width=True)
             
             # AI Insights Tab
             with tabs[1]:
                 st.subheader("AI-Generated Insights")
                 
-                if 'insights' in results['ai']:
-                    for i, insight in enumerate(results['ai']['insights'], 1):
-                        st.markdown(f"### Insight {i}: {insight.get('title', 'Analysis')}")
-                        st.write(insight.get('description', ''))
-                        
-                        if 'recommendations' in insight:
-                            st.markdown("**Recommendations:**")
-                            for rec in insight['recommendations']:
-                                st.write(f"• {rec}")
-                        
-                        if 'confidence' in insight:
-                            st.metric("Confidence Score", f"{insight['confidence']:.2%}")
-                        
-                        st.markdown("---")
+                # Check if there were errors
+                if 'errors' in results['ai'] and results['ai']['errors']:
+                    st.warning("Some AI agents encountered errors:")
+                    for error in results['ai']['errors']:
+                        st.error(f"• {error}")
+                    st.info("Showing available insights from successful agents:")
                 
-                if 'patterns' in results['ai']:
+                if 'insights' in results['ai'] and results['ai']['insights']:
+                    insights = results['ai']['insights']
+                    
+                    # Handle different insight formats
+                    if isinstance(insights, list):
+                        for i, insight in enumerate(insights, 1):
+                            if isinstance(insight, dict):
+                                st.markdown(f"### Insight {i}: {insight.get('title', 'Analysis')}")
+                                st.write(insight.get('description', ''))
+                                
+                                if 'recommendations' in insight:
+                                    st.markdown("**Recommendations:**")
+                                    recs = insight['recommendations']
+                                    if isinstance(recs, list):
+                                        for rec in recs:
+                                            st.write(f"• {rec}")
+                                    else:
+                                        st.write(recs)
+                                
+                                if 'confidence' in insight:
+                                    conf_value = insight['confidence']
+                                    if isinstance(conf_value, (int, float)):
+                                        st.metric("Confidence Score", f"{conf_value:.2%}" if conf_value <= 1 else f"{conf_value:.2f}")
+                                
+                                st.markdown("---")
+                            else:
+                                st.write(f"• {insight}")
+                    else:
+                        st.write(insights)
+                else:
+                    st.info("No AI insights were generated. This could be due to API issues or insufficient data.")
+                
+                if 'patterns' in results['ai'] and results['ai']['patterns']:
                     st.markdown("### Discovered Patterns")
-                    for pattern in results['ai']['patterns']:
-                        with st.expander(pattern.get('name', 'Pattern')):
-                            st.write(pattern.get('description', ''))
-                            if 'significance' in pattern:
-                                st.metric("Significance", pattern['significance'])
+                    patterns = results['ai']['patterns']
+                    if isinstance(patterns, list):
+                        for pattern in patterns:
+                            if isinstance(pattern, dict):
+                                with st.expander(pattern.get('name', 'Pattern')):
+                                    st.write(pattern.get('description', ''))
+                                    if 'significance' in pattern:
+                                        st.metric("Significance", pattern['significance'])
+                    elif isinstance(patterns, dict):
+                        st.json(patterns)
+                
+                # Show raw AI responses if available (for debugging)
+                with st.expander("View Raw AI Responses (Debug)"):
+                    if 'data_exploration' in results['ai'] and results['ai']['data_exploration']:
+                        st.markdown("**Data Exploration:**")
+                        st.json(results['ai']['data_exploration'])
+                    
+                    if 'statistical_analysis' in results['ai'] and results['ai']['statistical_analysis']:
+                        st.markdown("**Statistical Analysis:**")
+                        st.json(results['ai']['statistical_analysis'])
             
             # Visualizations Tab
             with tabs[2]:
                 st.subheader("Data Visualizations")
                 
-                if 'charts' in results['visualizations']:
-                    for chart in results['visualizations']['charts']:
-                        st.plotly_chart(chart, use_container_width=True)
+                if 'charts' in results['visualizations'] and results['visualizations']['charts']:
+                    for i, chart in enumerate(results['visualizations']['charts']):
+                        if chart is not None:
+                            try:
+                                st.plotly_chart(chart, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Could not display chart {i+1}: {str(e)}")
+                else:
+                    st.info("No visualizations available. Try running the analysis with more data.")
             
             # Summary Report Tab
             with tabs[3]:
                 st.subheader("Executive Summary Report")
                 
                 # Generate summary report
-                report = self._generate_summary_report(results)
-                st.markdown(report)
+                try:
+                    report = self._generate_summary_report(results)
+                    st.markdown(report)
+                except Exception as e:
+                    st.error(f"Could not generate summary report: {str(e)}")
+                    st.info("Showing basic results instead:")
+                    
+                    # Show basic summary
+                    if 'summary' in results['ai']:
+                        st.markdown("### AI Analysis Summary")
+                        st.write(results['ai']['summary'])
+                    
+                    if 'report' in results['ai']:
+                        st.markdown("### Detailed Report")
+                        st.write(results['ai']['report'])
             
             # Export Tab
             with tabs[4]:
@@ -653,35 +761,43 @@ This dataset contains e-commerce sales data from 2023. I want to:
                 with col1:
                     # Export as Excel
                     if st.button("📊 Export to Excel", use_container_width=True):
-                        excel_buffer = self._export_to_excel(results)
-                        st.download_button(
-                            label="Download Excel Report",
-                            data=excel_buffer,
-                            file_name=f"analysis_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        )
+                        try:
+                            excel_buffer = self._export_to_excel(results)
+                            st.download_button(
+                                label="Download Excel Report",
+                                data=excel_buffer,
+                                file_name=f"analysis_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            )
+                        except Exception as e:
+                            st.error(f"Could not create Excel export: {str(e)}")
                 
                 with col2:
-                    # Export as PDF
+                    # Export as PDF (placeholder)
                     if st.button("📄 Export to PDF", use_container_width=True):
-                        pdf_buffer = self._export_to_pdf(results)
-                        st.download_button(
-                            label="Download PDF Report",
-                            data=pdf_buffer,
-                            file_name=f"analysis_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                            mime="application/pdf"
-                        )
+                        st.info("PDF export will be available in the next version")
                 
                 with col3:
                     # Export as JSON
                     if st.button("💾 Export as JSON", use_container_width=True):
-                        json_data = json.dumps(results, indent=2, default=str)
-                        st.download_button(
-                            label="Download JSON Data",
-                            data=json_data,
-                            file_name=f"analysis_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                            mime="application/json"
-                        )
+                        try:
+                            # Clean results for JSON export
+                            clean_results = {}
+                            for key, value in results.items():
+                                if isinstance(value, pd.DataFrame):
+                                    clean_results[key] = value.to_dict()
+                                else:
+                                    clean_results[key] = value
+                            
+                            json_data = json.dumps(clean_results, indent=2, default=str)
+                            st.download_button(
+                                label="Download JSON Data",
+                                data=json_data,
+                                file_name=f"analysis_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                                mime="application/json"
+                            )
+                        except Exception as e:
+                            st.error(f"Could not create JSON export: {str(e)}")
         else:
             st.info("No analysis results available. Please run the analysis first.")
     
@@ -692,21 +808,65 @@ This dataset contains e-commerce sales data from 2023. I want to:
 **Generated on:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 ## Executive Summary
-{results.get('ai', {}).get('summary', 'Analysis completed successfully.')}
-
-## Key Findings
 """
         
-        # Add key insights
-        if 'insights' in results.get('ai', {}):
-            for i, insight in enumerate(results['ai']['insights'][:5], 1):
-                report += f"\n### Finding {i}: {insight.get('title', 'Insight')}\n"
-                report += f"{insight.get('description', '')}\n"
+        # Add AI summary if available
+        if 'ai' in results and 'summary' in results['ai']:
+            report += f"{results['ai']['summary']}\n\n"
+        else:
+            report += "Analysis completed successfully.\n\n"
         
-        # Add statistical summary
-        report += "\n## Statistical Overview\n"
-        if 'descriptive' in results.get('statistical', {}):
-            report += "\nKey statistics have been calculated for all numeric variables.\n"
+        # Add key statistics
+        if 'statistical' in results:
+            report += "## Statistical Overview\n"
+            
+            if 'descriptive' in results['statistical']:
+                report += "✅ Descriptive statistics calculated for all numeric variables.\n"
+            
+            if 'correlations' in results['statistical']:
+                corr_data = results['statistical']['correlations']
+                if isinstance(corr_data, dict) and 'significant_correlations' in corr_data:
+                    sig_corrs = corr_data['significant_correlations']
+                    if sig_corrs:
+                        report += f"✅ Found {len(sig_corrs)} significant correlations.\n"
+            
+            if 'outliers' in results['statistical']:
+                report += "✅ Outlier detection completed.\n"
+            
+            if 'pca_results' in results['statistical']:
+                pca_data = results['statistical']['pca_results']
+                if 'n_components_95' in pca_data:
+                    report += f"✅ PCA: {pca_data['n_components_95']} components explain 95% of variance.\n"
+        
+        report += "\n## Key Findings\n"
+        
+        # Add key insights
+        if 'ai' in results and 'insights' in results['ai']:
+            insights = results['ai']['insights']
+            if isinstance(insights, list):
+                for i, insight in enumerate(insights[:5], 1):  # Top 5 insights
+                    if isinstance(insight, dict):
+                        report += f"\n### Finding {i}: {insight.get('title', 'Insight')}\n"
+                        report += f"{insight.get('description', '')}\n"
+            else:
+                report += "AI analysis provided additional insights.\n"
+        else:
+            # Fallback to statistical findings
+            if 'statistical' in results and 'correlations' in results['statistical']:
+                corr_data = results['statistical']['correlations']
+                if isinstance(corr_data, dict) and 'significant_correlations' in corr_data:
+                    sig_corrs = corr_data['significant_correlations']
+                    for i, corr in enumerate(sig_corrs[:3], 1):
+                        report += f"\n### Finding {i}: Correlation detected\n"
+                        report += f"Strong relationship between {corr['var1']} and {corr['var2']} (r={corr['correlation']:.2f})\n"
+        
+        # Add errors if any
+        if 'ai' in results and 'errors' in results['ai'] and results['ai']['errors']:
+            report += "\n## ⚠️ Analysis Notes\n"
+            report += "Some AI agents encountered issues:\n"
+            for error in results['ai']['errors']:
+                report += f"- {error}\n"
+            report += "\nThe analysis was completed with available agents.\n"
         
         return report
     
@@ -714,37 +874,52 @@ This dataset contains e-commerce sales data from 2023. I want to:
         """Export results to Excel file"""
         output = BytesIO()
         
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            # Export processed data
-            if st.session_state.processed_data is not None:
-                st.session_state.processed_data.head(1000).to_excel(
-                    writer, 
-                    sheet_name='Data Sample',
-                    index=False
-                )
-            
-            # Export descriptive statistics
-            if 'descriptive' in results.get('statistical', {}):
-                results['statistical']['descriptive'].to_excel(
-                    writer,
-                    sheet_name='Descriptive Stats'
-                )
-            
-            # Export correlations
-            if 'correlations' in results.get('statistical', {}):
-                results['statistical']['correlations'].to_excel(
-                    writer,
-                    sheet_name='Correlations'
-                )
-            
-            # Export AI insights as DataFrame
-            if 'insights' in results.get('ai', {}):
-                insights_df = pd.DataFrame(results['ai']['insights'])
-                insights_df.to_excel(
-                    writer,
-                    sheet_name='AI Insights',
-                    index=False
-                )
+        try:
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                # Export processed data sample
+                if st.session_state.processed_data is not None:
+                    data_sample = st.session_state.processed_data.head(1000)
+                    data_sample.to_excel(writer, sheet_name='Data Sample', index=False)
+                
+                # Export descriptive statistics
+                if 'statistical' in results and 'descriptive' in results['statistical']:
+                    desc_stats = results['statistical']['descriptive']
+                    if isinstance(desc_stats, pd.DataFrame):
+                        desc_stats.to_excel(writer, sheet_name='Descriptive Stats')
+                    elif isinstance(desc_stats, dict):
+                        pd.DataFrame(desc_stats).to_excel(writer, sheet_name='Descriptive Stats')
+                
+                # Export correlations
+                if 'statistical' in results and 'correlations' in results['statistical']:
+                    corr_data = results['statistical']['correlations']
+                    if isinstance(corr_data, dict):
+                        if 'pearson' in corr_data and isinstance(corr_data['pearson'], pd.DataFrame):
+                            corr_data['pearson'].to_excel(writer, sheet_name='Correlations')
+                    elif isinstance(corr_data, pd.DataFrame):
+                        corr_data.to_excel(writer, sheet_name='Correlations')
+                
+                # Export AI insights
+                if 'ai' in results and 'insights' in results['ai']:
+                    insights = results['ai']['insights']
+                    if isinstance(insights, list) and insights:
+                        insights_df = pd.DataFrame(insights)
+                        insights_df.to_excel(writer, sheet_name='AI Insights', index=False)
+                
+                # Add a summary sheet
+                summary_data = {
+                    'Analysis Date': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
+                    'Total Rows': [len(st.session_state.data) if st.session_state.data is not None else 0],
+                    'Total Columns': [len(st.session_state.data.columns) if st.session_state.data is not None else 0],
+                    'AI APIs Used': [', '.join(st.session_state.api_keys.keys()) if st.session_state.api_keys else 'None']
+                }
+                pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
+        
+        except Exception as e:
+            logger.error(f"Error creating Excel export: {str(e)}")
+            # Create a simple error report
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                error_df = pd.DataFrame({'Error': [str(e)], 'Time': [datetime.now()]})
+                error_df.to_excel(writer, sheet_name='Error Report', index=False)
         
         output.seek(0)
         return output
