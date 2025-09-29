@@ -50,163 +50,195 @@ class AIAgentManager:
         
         # Initialize API clients
         if 'openai' in api_keys:
-            openai.api_key = api_keys['openai']
-            self.openai_client = openai
+            try:
+                # Try new OpenAI client (>=1.0.0)
+                from openai import OpenAI
+                self.openai_client = OpenAI(api_key=api_keys['openai'])
+                self.openai_legacy = False
+            except ImportError:
+                # Fall back to legacy client
+                import openai
+                openai.api_key = api_keys['openai']
+                self.openai_client = openai
+                self.openai_legacy = True
         
         if 'claude' in api_keys:
             self.anthropic_client = Anthropic(api_key=api_keys['claude'])
         
         # Token counter for OpenAI
-        self.encoding = tiktoken.get_encoding("cl100k_base")
+        try:
+            self.encoding = tiktoken.get_encoding("cl100k_base")
+        except:
+            self.encoding = None
     
     def _initialize_agents(self) -> Dict[AgentRole, AIAgent]:
         """Initialize specialized AI agents"""
         agents = {}
         
+        # Determina quale provider è disponibile
+        has_openai = 'openai' in self.api_keys
+        has_claude = 'claude' in self.api_keys
+        
+        # Se non c'è nessun provider, ritorna dizionario vuoto
+        if not has_openai and not has_claude:
+            logger.warning("No API providers available")
+            return agents
+        
+        # Imposta i provider di default per ogni agente basandosi su cosa è disponibile
+        default_provider = 'openai' if has_openai else 'claude'
+        default_openai_model = self.api_keys.get('openai_model', 'gpt-4-turbo')
+        default_claude_model = self.api_keys.get('claude_model', 'claude-3-5-sonnet-20241022')
+        
         # Data Explorer Agent
-        agents[AgentRole.DATA_EXPLORER] = AIAgent(
-            name="Data Explorer",
-            role=AgentRole.DATA_EXPLORER,
-            model=self.api_keys.get('claude_model', 'claude-3-opus-20240229'),
-            provider='claude',
-            temperature=0.3,
-            max_tokens=4000,
-            system_prompt="""You are a specialized data exploration agent with deep expertise in:
-            - Identifying data types, distributions, and quality issues
-            - Detecting anomalies and outliers using statistical methods
-            - Understanding relationships between variables
-            - Providing actionable data cleaning recommendations
-            
-            Analyze the provided dataset and return structured insights in JSON format with:
-            1. Data quality assessment
-            2. Distribution characteristics
-            3. Anomaly detection results
-            4. Relationship patterns
-            5. Recommended preprocessing steps"""
-        )
+        if has_claude or has_openai:
+            agents[AgentRole.DATA_EXPLORER] = AIAgent(
+                name="Data Explorer",
+                role=AgentRole.DATA_EXPLORER,
+                model=default_claude_model if has_claude else default_openai_model,
+                provider='claude' if has_claude else 'openai',
+                temperature=0.3,
+                max_tokens=4000,
+                system_prompt="""You are a specialized data exploration agent with deep expertise in:
+                - Identifying data types, distributions, and quality issues
+                - Detecting anomalies and outliers using statistical methods
+                - Understanding relationships between variables
+                - Providing actionable data cleaning recommendations
+                
+                Analyze the provided dataset and return structured insights in JSON format with:
+                1. Data quality assessment
+                2. Distribution characteristics
+                3. Anomaly detection results
+                4. Relationship patterns
+                5. Recommended preprocessing steps"""
+            )
         
         # Pattern Detector Agent
-        agents[AgentRole.PATTERN_DETECTOR] = AIAgent(
-            name="Pattern Detector",
-            role=AgentRole.PATTERN_DETECTOR,
-            model=self.api_keys.get('openai_model', 'gpt-4-turbo-preview'),
-            provider='openai',
-            temperature=0.5,
-            max_tokens=4000,
-            system_prompt="""You are an advanced pattern detection specialist focused on:
-            - Identifying recurring patterns and cycles in data
-            - Detecting seasonal trends and periodicities
-            - Finding hidden correlations and dependencies
-            - Discovering segment patterns and clusters
-            - Recognizing anomalous pattern breaks
-            
-            Use advanced statistical techniques including:
-            - Fourier analysis for periodicity detection
-            - Autocorrelation for time dependencies
-            - Cross-correlation for relationship discovery
-            - Change point detection algorithms
-            
-            Return findings as structured JSON with pattern descriptions, significance scores, and visualizations recommendations."""
-        )
+        if has_openai or has_claude:
+            agents[AgentRole.PATTERN_DETECTOR] = AIAgent(
+                name="Pattern Detector",
+                role=AgentRole.PATTERN_DETECTOR,
+                model=default_openai_model if has_openai else default_claude_model,
+                provider='openai' if has_openai else 'claude',
+                temperature=0.5,
+                max_tokens=4000,
+                system_prompt="""You are an advanced pattern detection specialist focused on:
+                - Identifying recurring patterns and cycles in data
+                - Detecting seasonal trends and periodicities
+                - Finding hidden correlations and dependencies
+                - Discovering segment patterns and clusters
+                - Recognizing anomalous pattern breaks
+                
+                Use advanced statistical techniques including:
+                - Fourier analysis for periodicity detection
+                - Autocorrelation for time dependencies
+                - Cross-correlation for relationship discovery
+                - Change point detection algorithms
+                
+                Return findings as structured JSON with pattern descriptions, significance scores, and visualizations recommendations."""
+            )
         
         # Statistical Analyst Agent
-        agents[AgentRole.STATISTICAL_ANALYST] = AIAgent(
-            name="Statistical Analyst",
-            role=AgentRole.STATISTICAL_ANALYST,
-            model=self.api_keys.get('openai_model', 'gpt-4-turbo-preview'),
-            provider='openai',
-            temperature=0.2,
-            max_tokens=4000,
-            system_prompt="""You are an expert statistical analyst with proficiency in:
-            - Hypothesis testing and significance analysis
-            - Multivariate statistical methods (PCA, FAMD, Factor Analysis)
-            - Time series analysis (ARIMA, seasonal decomposition)
-            - Regression analysis (linear, logistic, polynomial)
-            - Bayesian inference and probabilistic modeling
-            
-            Perform rigorous statistical analysis and provide:
-            1. Statistical test results with p-values and confidence intervals
-            2. Effect sizes and practical significance
-            3. Model diagnostics and assumptions validation
-            4. Interpretation of complex statistical outputs
-            
-            Format results as structured JSON with clear interpretations for non-technical stakeholders."""
-        )
+        if has_openai or has_claude:
+            agents[AgentRole.STATISTICAL_ANALYST] = AIAgent(
+                name="Statistical Analyst",
+                role=AgentRole.STATISTICAL_ANALYST,
+                model=default_openai_model if has_openai else default_claude_model,
+                provider='openai' if has_openai else 'claude',
+                temperature=0.2,
+                max_tokens=4000,
+                system_prompt="""You are an expert statistical analyst with proficiency in:
+                - Hypothesis testing and significance analysis
+                - Multivariate statistical methods (PCA, FAMD, Factor Analysis)
+                - Time series analysis (ARIMA, seasonal decomposition)
+                - Regression analysis (linear, logistic, polynomial)
+                - Bayesian inference and probabilistic modeling
+                
+                Perform rigorous statistical analysis and provide:
+                1. Statistical test results with p-values and confidence intervals
+                2. Effect sizes and practical significance
+                3. Model diagnostics and assumptions validation
+                4. Interpretation of complex statistical outputs
+                
+                Format results as structured JSON with clear interpretations for non-technical stakeholders."""
+            )
         
         # Predictive Modeler Agent
-        agents[AgentRole.PREDICTIVE_MODELER] = AIAgent(
-            name="Predictive Modeler",
-            role=AgentRole.PREDICTIVE_MODELER,
-            model=self.api_keys.get('claude_model', 'claude-3-opus-20240229'),
-            provider='claude',
-            temperature=0.4,
-            max_tokens=4000,
-            system_prompt="""You are a machine learning expert specializing in:
-            - Feature engineering and selection
-            - Model selection and hyperparameter tuning
-            - Ensemble methods and model stacking
-            - Time series forecasting
-            - Classification and regression tasks
-            
-            Analyze the data to:
-            1. Recommend appropriate predictive models
-            2. Identify key predictive features
-            3. Suggest target variables for prediction
-            4. Provide forecast scenarios with confidence intervals
-            5. Explain model predictions in business terms
-            
-            Return structured recommendations with model performance metrics and implementation guidelines."""
-        )
+        if has_claude or has_openai:
+            agents[AgentRole.PREDICTIVE_MODELER] = AIAgent(
+                name="Predictive Modeler",
+                role=AgentRole.PREDICTIVE_MODELER,
+                model=default_claude_model if has_claude else default_openai_model,
+                provider='claude' if has_claude else 'openai',
+                temperature=0.4,
+                max_tokens=4000,
+                system_prompt="""You are a machine learning expert specializing in:
+                - Feature engineering and selection
+                - Model selection and hyperparameter tuning
+                - Ensemble methods and model stacking
+                - Time series forecasting
+                - Classification and regression tasks
+                
+                Analyze the data to:
+                1. Recommend appropriate predictive models
+                2. Identify key predictive features
+                3. Suggest target variables for prediction
+                4. Provide forecast scenarios with confidence intervals
+                5. Explain model predictions in business terms
+                
+                Return structured recommendations with model performance metrics and implementation guidelines."""
+            )
         
         # Insight Generator Agent
-        agents[AgentRole.INSIGHT_GENERATOR] = AIAgent(
-            name="Insight Generator",
-            role=AgentRole.INSIGHT_GENERATOR,
-            model=self.api_keys.get('openai_model', 'gpt-4-turbo-preview'),
-            provider='openai',
-            temperature=0.7,
-            max_tokens=4000,
-            system_prompt="""You are a business intelligence expert who transforms data findings into actionable insights:
-            - Connect statistical findings to business impact
-            - Generate strategic recommendations
-            - Identify opportunities and risks
-            - Provide competitive intelligence perspectives
-            - Create actionable next steps
-            
-            Synthesize all analysis results to produce:
-            1. Executive-level insights with business implications
-            2. Strategic recommendations with priority scores
-            3. Risk assessments and mitigation strategies
-            4. Opportunity identification with ROI estimates
-            5. Action plans with timelines
-            
-            Format as structured JSON optimized for decision-making."""
-        )
+        if has_openai or has_claude:
+            agents[AgentRole.INSIGHT_GENERATOR] = AIAgent(
+                name="Insight Generator",
+                role=AgentRole.INSIGHT_GENERATOR,
+                model=default_openai_model if has_openai else default_claude_model,
+                provider='openai' if has_openai else 'claude',
+                temperature=0.7,
+                max_tokens=4000,
+                system_prompt="""You are a business intelligence expert who transforms data findings into actionable insights:
+                - Connect statistical findings to business impact
+                - Generate strategic recommendations
+                - Identify opportunities and risks
+                - Provide competitive intelligence perspectives
+                - Create actionable next steps
+                
+                Synthesize all analysis results to produce:
+                1. Executive-level insights with business implications
+                2. Strategic recommendations with priority scores
+                3. Risk assessments and mitigation strategies
+                4. Opportunity identification with ROI estimates
+                5. Action plans with timelines
+                
+                Format as structured JSON optimized for decision-making."""
+            )
         
         # Report Writer Agent
-        agents[AgentRole.REPORT_WRITER] = AIAgent(
-            name="Report Writer",
-            role=AgentRole.REPORT_WRITER,
-            model=self.api_keys.get('claude_model', 'claude-3-opus-20240229'),
-            provider='claude',
-            temperature=0.5,
-            max_tokens=8000,
-            system_prompt="""You are an expert technical writer specializing in data analysis reports:
-            - Create clear, concise executive summaries
-            - Explain complex findings in accessible language
-            - Structure reports for maximum impact
-            - Include relevant visualizations and their interpretations
-            - Provide comprehensive methodology documentation
-            
-            Generate professional reports including:
-            1. Executive summary with key takeaways
-            2. Methodology and approach explanation
-            3. Detailed findings with supporting evidence
-            4. Conclusions and recommendations
-            5. Technical appendix for advanced users
-            
-            Use markdown formatting for clarity and professional presentation."""
-        )
+        if has_claude or has_openai:
+            agents[AgentRole.REPORT_WRITER] = AIAgent(
+                name="Report Writer",
+                role=AgentRole.REPORT_WRITER,
+                model=default_claude_model if has_claude else default_openai_model,
+                provider='claude' if has_claude else 'openai',
+                temperature=0.5,
+                max_tokens=8000,
+                system_prompt="""You are an expert technical writer specializing in data analysis reports:
+                - Create clear, concise executive summaries
+                - Explain complex findings in accessible language
+                - Structure reports for maximum impact
+                - Include relevant visualizations and their interpretations
+                - Provide comprehensive methodology documentation
+                
+                Generate professional reports including:
+                1. Executive summary with key takeaways
+                2. Methodology and approach explanation
+                3. Detailed findings with supporting evidence
+                4. Conclusions and recommendations
+                5. Technical appendix for advanced users
+                
+                Use markdown formatting for clarity and professional presentation."""
+            )
         
         return agents
     
@@ -219,16 +251,27 @@ class AIAgentManager:
                 {"role": "user", "content": f"Data Context:\n{data_context}\n\nAnalysis Request:\n{prompt}"}
             ]
             
-            response = await asyncio.to_thread(
-                self.openai_client.ChatCompletion.create,
-                model=agent.model,
-                messages=messages,
-                temperature=agent.temperature,
-                max_tokens=agent.max_tokens,
-                response_format={"type": "json_object"} if "json" in agent.system_prompt.lower() else None
-            )
-            
-            content = response.choices[0].message.content
+            if not self.openai_legacy:
+                # Use new OpenAI client (>=1.0.0)
+                response = await asyncio.to_thread(
+                    self.openai_client.chat.completions.create,
+                    model=agent.model,
+                    messages=messages,
+                    temperature=agent.temperature,
+                    max_tokens=agent.max_tokens,
+                    response_format={"type": "json_object"} if "json" in agent.system_prompt.lower() else None
+                )
+                content = response.choices[0].message.content
+            else:
+                # Use legacy OpenAI client
+                response = await asyncio.to_thread(
+                    self.openai_client.ChatCompletion.create,
+                    model=agent.model,
+                    messages=messages,
+                    temperature=agent.temperature,
+                    max_tokens=agent.max_tokens
+                )
+                content = response.choices[0].message.content
             
             # Try to parse as JSON if expected
             if "json" in agent.system_prompt.lower():
