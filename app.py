@@ -1,8 +1,8 @@
 """
-AI-Powered Advanced Data Analysis Tool
-Main Application File: app.py
-Author: AI Data Analysis Framework
-Version: 1.0.0
+Strumento Avanzato di Analisi Dati con IA
+File Applicazione Principale: app.py
+Autore: Framework di Analisi Dati IA
+Versione: 1.0.0
 """
 
 import streamlit as st
@@ -31,7 +31,7 @@ from src.utils import validate_api_key, chunk_data, safe_process
 
 # Page configuration
 st.set_page_config(
-    page_title="AI Data Analysis Tool",
+    page_title="Strumento di Analisi Dati con IA",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -78,7 +78,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 class AIDataAnalysisApp:
-    """Main application class for AI-powered data analysis"""
+    """Classe principale dell'applicazione per l'analisi dei dati con IA"""
     
     def __init__(self):
         self.initialize_session_state()
@@ -88,7 +88,7 @@ class AIDataAnalysisApp:
         self.visualization_engine = VisualizationEngine()
         
     def initialize_session_state(self):
-        """Initialize Streamlit session state variables"""
+        """Inizializza le variabili di stato di Streamlit"""
         if 'data' not in st.session_state:
             st.session_state.data = None
         if 'processed_data' not in st.session_state:
@@ -105,146 +105,146 @@ class AIDataAnalysisApp:
             st.session_state.cache = {}
             
     def render_header(self):
-        """Render application header"""
-        st.markdown('<h1 class="main-header">🚀 AI-Powered Data Analysis Tool</h1>', 
+        """Visualizza l'intestazione dell'applicazione"""
+        st.markdown('<h1 class="main-header">🚀 Strumento di Analisi Dati con Intelligenza Artificiale</h1>', 
                    unsafe_allow_html=True)
         st.markdown("---")
         
-        # Display current status
+        # Visualizza lo stato corrente
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            status = "✅ Ready" if st.session_state.data is not None else "⏳ Waiting"
-            st.metric("Data Status", status)
+            status = "✅ Pronto" if st.session_state.data is not None else "⏳ In attesa"
+            st.metric("Stato Dati", status)
         with col2:
             openai_status = "✅" if st.session_state.api_keys.get('openai') else "❌"
             claude_status = "✅" if st.session_state.api_keys.get('claude') else "❌"
             api_status = f"OpenAI {openai_status} | Claude {claude_status}"
-            st.metric("AI APIs", api_status)
+            st.metric("API IA", api_status)
         with col3:
             rows = len(st.session_state.data) if st.session_state.data is not None else 0
-            st.metric("Total Rows", f"{rows:,}")
+            st.metric("Totale Righe", f"{rows:,}")
         with col4:
             cols = len(st.session_state.data.columns) if st.session_state.data is not None else 0
-            st.metric("Total Columns", cols)
+            st.metric("Totale Colonne", cols)
     
     def step1_api_authentication(self):
-        """Step 1: API Authentication"""
-        st.markdown('<div class="step-header">🔐 Step 1: AI API Authentication (Optional)</div>', 
+        """Passo 1: Autenticazione API"""
+        st.markdown('<div class="step-header">🔐 Passo 1: Autenticazione API IA (Opzionale)</div>', 
                    unsafe_allow_html=True)
         
-        st.info("💡 You can use either OpenAI, Claude, or both. If you don't have API keys, you can still use the statistical analysis features.")
+        st.info("💡 Puoi utilizzare OpenAI, Claude o entrambi. Se non hai chiavi API, puoi comunque utilizzare le funzionalità di analisi statistica.")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("OpenAI Configuration")
+            st.subheader("Configurazione OpenAI")
             openai_key = st.text_input(
-                "OpenAI API Key",
+                "Chiave API OpenAI",
                 type="password",
                 value=st.session_state.api_keys.get('openai', ''),
-                help="Enter your OpenAI API key for GPT-4 access"
+                help="Inserisci la tua chiave API OpenAI per l'accesso a GPT-4"
             )
             
             openai_model = st.selectbox(
-                "Select OpenAI Model",
+                "Seleziona Modello OpenAI",
                 ["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo", "gpt-3.5-turbo-16k"],
-                help="Choose the OpenAI model for analysis"
+                help="Scegli il modello OpenAI per l'analisi"
             )
             
-            if st.button("Set OpenAI Key", key="set_openai"):
+            if st.button("Imposta Chiave OpenAI", key="set_openai"):
                 if openai_key:
                     st.session_state.api_keys['openai'] = openai_key
                     st.session_state.api_keys['openai_model'] = openai_model
-                    st.success("✅ OpenAI API key set! (validation skipped for faster setup)")
+                    st.success("✅ Chiave API OpenAI impostata! (validazione saltata per configurazione più veloce)")
                 else:
-                    st.warning("Please enter an API key")
+                    st.warning("Inserisci una chiave API")
         
         with col2:
-            st.subheader("Claude Configuration")
+            st.subheader("Configurazione Claude")
             claude_key = st.text_input(
-                "Claude API Key",
+                "Chiave API Claude",
                 type="password",
                 value=st.session_state.api_keys.get('claude', ''),
-                help="Enter your Anthropic Claude API key"
+                help="Inserisci la tua chiave API Anthropic Claude"
             )
             
             claude_model = st.selectbox(
-                "Select Claude Model",
+                "Seleziona Modello Claude",
                 ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
-                help="Choose the Claude model for analysis"
+                help="Scegli il modello Claude per l'analisi"
             )
             
-            if st.button("Set Claude Key", key="set_claude"):
+            if st.button("Imposta Chiave Claude", key="set_claude"):
                 if claude_key:
                     st.session_state.api_keys['claude'] = claude_key
                     st.session_state.api_keys['claude_model'] = claude_model
-                    st.success("✅ Claude API key set! (validation skipped for faster setup)")
+                    st.success("✅ Chiave API Claude impostata! (validazione saltata per configurazione più veloce)")
                 else:
-                    st.warning("Please enter an API key")
+                    st.warning("Inserisci una chiave API")
         
-        # Show current configuration status
+        # Mostra lo stato della configurazione corrente
         st.markdown("---")
-        st.markdown("### Current Configuration:")
+        st.markdown("### Configurazione Corrente:")
         
         config_cols = st.columns(3)
         with config_cols[0]:
             if st.session_state.api_keys.get('openai'):
-                st.success(f"✅ OpenAI configured ({st.session_state.api_keys.get('openai_model', 'gpt-4')})")
+                st.success(f"✅ OpenAI configurato ({st.session_state.api_keys.get('openai_model', 'gpt-4')})")
             else:
-                st.info("⚪ OpenAI not configured")
+                st.info("⚪ OpenAI non configurato")
         
         with config_cols[1]:
             if st.session_state.api_keys.get('claude'):
-                st.success(f"✅ Claude configured ({st.session_state.api_keys.get('claude_model', 'claude-3')})")
+                st.success(f"✅ Claude configurato ({st.session_state.api_keys.get('claude_model', 'claude-3')})")
             else:
-                st.info("⚪ Claude not configured")
+                st.info("⚪ Claude non configurato")
         
         with config_cols[2]:
             if not st.session_state.api_keys:
-                st.warning("⚠️ No AI configured - only statistical analysis available")
+                st.warning("⚠️ Nessuna IA configurata - disponibile solo analisi statistica")
         
-        # Initialize AI Manager if keys are available
+        # Inizializza AI Manager se le chiavi sono disponibili
         if st.session_state.api_keys:
-            if st.button("Initialize AI Agents", type="primary"):
-                with st.spinner("Initializing AI agents..."):
+            if st.button("Inizializza Agenti IA", type="primary"):
+                with st.spinner("Inizializzazione agenti IA..."):
                     try:
                         st.session_state.ai_manager = AIAgentManager(st.session_state.api_keys)
                         agent_count = len(st.session_state.ai_manager.agents)
-                        st.success(f"✅ {agent_count} AI agents initialized successfully!")
+                        st.success(f"✅ {agent_count} agenti IA inizializzati con successo!")
                         
-                        # Show which agents are available
+                        # Mostra quali agenti sono disponibili
                         if agent_count > 0:
-                            st.write("Available agents:")
+                            st.write("Agenti disponibili:")
                             for agent in st.session_state.ai_manager.agents.values():
                                 st.write(f"- {agent.name} ({agent.provider}: {agent.model})")
                     except Exception as e:
-                        st.error(f"Error initializing agents: {str(e)}")
-                        st.info("Try setting the API keys again with the correct format.")
+                        st.error(f"Errore nell'inizializzazione degli agenti: {str(e)}")
+                        st.info("Prova a impostare nuovamente le chiavi API con il formato corretto.")
     
     def step2_data_upload(self):
-        """Step 2: Data Upload"""
-        st.markdown('<div class="step-header">📁 Step 2: Data Upload</div>', 
+        """Passo 2: Caricamento Dati"""
+        st.markdown('<div class="step-header">📁 Passo 2: Caricamento Dati</div>', 
                    unsafe_allow_html=True)
         
         col1, col2 = st.columns([2, 1])
         
         with col1:
             uploaded_file = st.file_uploader(
-                "Choose a CSV or Excel file",
+                "Scegli un file CSV o Excel",
                 type=['csv', 'xlsx', 'xls'],
-                help="Upload your data file for analysis"
+                help="Carica il tuo file dati per l'analisi"
             )
             
             if uploaded_file is not None:
-                # Check file size
-                file_size = uploaded_file.size / (1024 * 1024)  # Convert to MB
-                st.info(f"📊 File size: {file_size:.2f} MB")
+                # Controlla la dimensione del file
+                file_size = uploaded_file.size / (1024 * 1024)  # Converti in MB
+                st.info(f"📊 Dimensione file: {file_size:.2f} MB")
                 
                 try:
-                    # Load data with progress bar
-                    with st.spinner(f"Loading {uploaded_file.name}..."):
+                    # Carica i dati con barra di progresso
+                    with st.spinner(f"Caricamento {uploaded_file.name}..."):
                         if uploaded_file.name.endswith('.csv'):
-                            # Try different encodings
+                            # Prova diverse codifiche
                             encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
                             for encoding in encodings:
                                 try:
@@ -262,30 +262,30 @@ class AIDataAnalysisApp:
                                 engine='openpyxl'
                             )
                     
-                    # Data validation
-                    st.success(f"✅ Successfully loaded {len(st.session_state.data):,} rows and {len(st.session_state.data.columns)} columns")
+                    # Validazione dati
+                    st.success(f"✅ Caricati con successo {len(st.session_state.data):,} righe e {len(st.session_state.data.columns)} colonne")
                     
-                    # Data preview
-                    st.subheader("Data Preview")
+                    # Anteprima dati
+                    st.subheader("Anteprima Dati")
                     st.dataframe(
                         st.session_state.data.head(100),
                         use_container_width=True
                     )
                     
                 except Exception as e:
-                    st.error(f"❌ Error loading file: {str(e)}")
+                    st.error(f"❌ Errore nel caricamento del file: {str(e)}")
         
         with col2:
             if st.session_state.data is not None:
-                st.subheader("Data Information")
+                st.subheader("Informazioni Dati")
                 
-                # Basic statistics
-                st.markdown("**Data Types:**")
+                # Statistiche di base
+                st.markdown("**Tipi di Dati:**")
                 dtype_counts = st.session_state.data.dtypes.value_counts()
                 for dtype, count in dtype_counts.items():
-                    st.write(f"- {dtype}: {count} columns")
+                    st.write(f"- {dtype}: {count} colonne")
                 
-                st.markdown("**Missing Values:**")
+                st.markdown("**Valori Mancanti:**")
                 missing_data = st.session_state.data.isnull().sum()
                 missing_data = missing_data[missing_data > 0]
                 if len(missing_data) > 0:
@@ -293,117 +293,117 @@ class AIDataAnalysisApp:
                         pct = (count / len(st.session_state.data)) * 100
                         st.write(f"- {col}: {count} ({pct:.1f}%)")
                 else:
-                    st.write("No missing values found! ✨")
+                    st.write("Nessun valore mancante trovato! ✨")
                 
-                # Memory usage
+                # Utilizzo memoria
                 memory_usage = st.session_state.data.memory_usage(deep=True).sum() / 1024**2
-                st.metric("Memory Usage", f"{memory_usage:.2f} MB")
+                st.metric("Utilizzo Memoria", f"{memory_usage:.2f} MB")
     
     def step3_column_mapping(self):
-        """Step 3: Column Mapping"""
-        st.markdown('<div class="step-header">🗂️ Step 3: Column Mapping & Categorization</div>', 
+        """Passo 3: Mappatura Colonne"""
+        st.markdown('<div class="step-header">🗂️ Passo 3: Mappatura e Categorizzazione Colonne</div>', 
                    unsafe_allow_html=True)
         
         if st.session_state.data is not None:
-            st.write("Map your columns to semantic categories for better AI understanding:")
+            st.write("Mappa le tue colonne in categorie semantiche per una migliore comprensione da parte dell'IA:")
             
-            # Predefined categories
+            # Categorie predefinite
             categories = [
-                "Identifier", "Date/Time", "Numeric Measure", "Category/Label",
-                "Text/Description", "Target Variable", "Feature", "Location",
-                "Currency", "Percentage", "Score/Rating", "Boolean", "Other"
+                "Identificatore", "Data/Ora", "Misura Numerica", "Categoria/Etichetta",
+                "Testo/Descrizione", "Variabile Target", "Feature", "Località",
+                "Valuta", "Percentuale", "Punteggio/Valutazione", "Booleano", "Altro"
             ]
             
-            # Smart category suggestion based on column name
+            # Suggerimento intelligente di categoria basato sul nome della colonna
             def suggest_category(col_name: str, dtype: str, unique_ratio: float) -> str:
                 col_lower = col_name.lower()
                 
-                # Date/Time patterns
-                if any(x in col_lower for x in ['date', 'time', 'timestamp', 'datetime', 'created', 'updated']):
-                    return "Date/Time"
+                # Pattern Data/Ora
+                if any(x in col_lower for x in ['date', 'data', 'time', 'tempo', 'timestamp', 'datetime', 'created', 'creato', 'updated', 'aggiornato']):
+                    return "Data/Ora"
                 
-                # Currency/Money patterns
-                if any(x in col_lower for x in ['cost', 'price', 'revenue', 'amount', 'spend', 'budget', 
+                # Pattern Valuta/Denaro
+                if any(x in col_lower for x in ['cost', 'costo', 'price', 'prezzo', 'revenue', 'ricavo', 'amount', 'importo', 'spend', 'spesa', 'budget', 
                                                 'entrate', 'uscite', 'euro', 'dollar', 'usd', 'eur', 
-                                                'payment', 'fee', 'charge']):
-                    # Revenue/entrate are usually targets
-                    if any(x in col_lower for x in ['revenue', 'entrate', 'profit', 'income', 'sales']):
-                        return "Target Variable"
+                                                'payment', 'pagamento', 'fee', 'tariffa', 'charge']):
+                    # Ricavi/entrate sono solitamente target
+                    if any(x in col_lower for x in ['revenue', 'ricavo', 'entrate', 'profit', 'profitto', 'income', 'reddito', 'sales', 'vendite']):
+                        return "Variabile Target"
                     else:
-                        return "Currency"
+                        return "Valuta"
                 
-                # Percentage patterns
-                if any(x in col_lower for x in ['percent', 'rate', 'ratio', 'pct', '%']):
-                    return "Percentage"
+                # Pattern Percentuale
+                if any(x in col_lower for x in ['percent', 'percentuale', 'rate', 'tasso', 'ratio', 'rapporto', 'pct', '%']):
+                    return "Percentuale"
                 
-                # ID patterns
-                if any(x in col_lower for x in ['id', 'key', 'code', 'identifier']) and unique_ratio > 0.9:
-                    return "Identifier"
+                # Pattern ID
+                if any(x in col_lower for x in ['id', 'key', 'chiave', 'code', 'codice', 'identifier', 'identificatore']) and unique_ratio > 0.9:
+                    return "Identificatore"
                 
-                # Boolean patterns
+                # Pattern Booleani
                 if dtype == 'bool' or unique_ratio == 2:
-                    return "Boolean"
+                    return "Booleano"
                 
-                # Category patterns
-                if unique_ratio < 0.05 or any(x in col_lower for x in ['category', 'type', 'class', 'group', 'status']):
-                    return "Category/Label"
+                # Pattern Categoria
+                if unique_ratio < 0.05 or any(x in col_lower for x in ['category', 'categoria', 'type', 'tipo', 'class', 'classe', 'group', 'gruppo', 'status', 'stato']):
+                    return "Categoria/Etichetta"
                 
-                # Numeric patterns
+                # Pattern Numerici
                 if 'float' in dtype or 'int' in dtype:
-                    if any(x in col_lower for x in ['score', 'rating']):
-                        return "Score/Rating"
+                    if any(x in col_lower for x in ['score', 'punteggio', 'rating', 'valutazione']):
+                        return "Punteggio/Valutazione"
                     else:
-                        return "Numeric Measure"
+                        return "Misura Numerica"
                 
-                # Text patterns
+                # Pattern Testo
                 if dtype == 'object' and unique_ratio > 0.5:
-                    return "Text/Description"
+                    return "Testo/Descrizione"
                 
-                return "Other"
+                return "Altro"
             
-            # Create mapping interface
+            # Crea interfaccia di mappatura
             col1, col2, col3 = st.columns(3)
             
             columns = st.session_state.data.columns.tolist()
             
             for i, column in enumerate(columns):
                 with [col1, col2, col3][i % 3]:
-                    # Display column info
+                    # Visualizza info colonna
                     dtype = str(st.session_state.data[column].dtype)
                     unique_count = st.session_state.data[column].nunique()
                     unique_ratio = unique_count / len(st.session_state.data)
                     
                     st.markdown(f"**{column}**")
-                    st.caption(f"Type: {dtype} | Unique: {unique_count}")
+                    st.caption(f"Tipo: {dtype} | Unici: {unique_count}")
                     
-                    # Get suggested category
+                    # Ottieni categoria suggerita
                     suggested_cat = suggest_category(column, dtype, unique_ratio)
                     
-                    # Category selection with smart default
+                    # Selezione categoria con default intelligente
                     selected_category = st.selectbox(
-                        "Category",
+                        "Categoria",
                         categories,
                         index=categories.index(suggested_cat),
                         key=f"cat_{column}",
                         label_visibility="collapsed"
                     )
                     
-                    # Custom description with helpful placeholder
+                    # Descrizione personalizzata con placeholder utile
                     placeholder_text = {
-                        "Target Variable": "Variabile da prevedere/ottimizzare",
-                        "Currency": "Spesa o costo in valuta",
-                        "Date/Time": "Per analisi temporali e trend",
+                        "Variabile Target": "Variabile da prevedere/ottimizzare",
+                        "Valuta": "Spesa o costo in valuta",
+                        "Data/Ora": "Per analisi temporali e trend",
                         "Feature": "Variabile predittiva",
-                        "Identifier": "ID univoco, escluso da correlazioni"
-                    }.get(selected_category, "Aggiungi contesto per l'AI")
+                        "Identificatore": "ID univoco, escluso da correlazioni"
+                    }.get(selected_category, "Aggiungi contesto per l'IA")
                     
                     custom_desc = st.text_input(
-                        "Description (optional)",
+                        "Descrizione (opzionale)",
                         key=f"desc_{column}",
                         placeholder=placeholder_text
                     )
                     
-                    # Store mapping
+                    # Memorizza mappatura
                     st.session_state.column_mapping[column] = {
                         'category': selected_category,
                         'description': custom_desc,
@@ -411,92 +411,92 @@ class AIDataAnalysisApp:
                         'unique_count': unique_count
                     }
             
-            # Display current mapping
-            if st.button("Save Column Mapping", type="primary"):
-                st.success("✅ Column mapping saved successfully!")
+            # Visualizza mappatura corrente
+            if st.button("Salva Mappatura Colonne", type="primary"):
+                st.success("✅ Mappatura colonne salvata con successo!")
                 st.json(st.session_state.column_mapping)
     
     def step4_context_prompt(self):
-        """Step 4: Context and Analysis Prompt"""
-        st.markdown('<div class="step-header">💭 Step 4: Analysis Context & Objectives</div>', 
+        """Passo 4: Contesto e Prompt di Analisi"""
+        st.markdown('<div class="step-header">💭 Passo 4: Contesto e Obiettivi di Analisi</div>', 
                    unsafe_allow_html=True)
         
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            st.subheader("Analysis Context")
+            st.subheader("Contesto Analisi")
             
-            # Main context prompt
+            # Prompt contesto principale
             context_prompt = st.text_area(
-                "Describe your data and analysis objectives",
+                "Descrivi i tuoi dati e gli obiettivi di analisi",
                 height=150,
-                placeholder="""Example:
-This dataset contains e-commerce sales data from 2023. I want to:
-1. Identify top-performing products and categories
-2. Analyze seasonal trends and patterns
-3. Predict future sales based on historical data
-4. Find correlations between marketing spend and revenue
-5. Segment customers based on purchasing behavior""",
-                help="Provide detailed context to guide the AI analysis"
+                placeholder="""Esempio:
+Questo dataset contiene dati di vendite e-commerce del 2023. Voglio:
+1. Identificare i prodotti e le categorie con le migliori prestazioni
+2. Analizzare trend e pattern stagionali
+3. Prevedere le vendite future basandomi sui dati storici
+4. Trovare correlazioni tra spesa marketing e ricavi
+5. Segmentare i clienti in base al comportamento d'acquisto""",
+                help="Fornisci un contesto dettagliato per guidare l'analisi IA"
             )
             
-            # Analysis type selection
-            st.subheader("Select Analysis Types")
+            # Selezione tipo di analisi
+            st.subheader("Seleziona Tipi di Analisi")
             
             col_a, col_b = st.columns(2)
             
             with col_a:
                 analysis_types = st.multiselect(
-                    "Statistical Analysis",
+                    "Analisi Statistica",
                     [
-                        "Descriptive Statistics",
-                        "Correlation Analysis",
-                        "Time Series Analysis",
-                        "Distribution Analysis",
-                        "Outlier Detection",
-                        "Hypothesis Testing"
+                        "Statistiche Descrittive",
+                        "Analisi Correlazioni",
+                        "Analisi Serie Temporali",
+                        "Analisi Distribuzioni",
+                        "Rilevamento Outlier",
+                        "Test di Ipotesi"
                     ],
-                    default=["Descriptive Statistics", "Correlation Analysis"]
+                    default=["Statistiche Descrittive", "Analisi Correlazioni"]
                 )
             
             with col_b:
                 advanced_analysis = st.multiselect(
-                    "Advanced Analysis",
+                    "Analisi Avanzata",
                     [
-                        "PCA (Principal Component Analysis)",
-                        "FAMD (Factor Analysis of Mixed Data)",
-                        "Clustering Analysis",
-                        "Regression Analysis",
-                        "Forecasting",
-                        "Anomaly Detection"
+                        "PCA (Analisi Componenti Principali)",
+                        "FAMD (Analisi Fattoriale Dati Misti)",
+                        "Analisi Clustering",
+                        "Analisi di Regressione",
+                        "Previsioni",
+                        "Rilevamento Anomalie"
                     ],
-                    default=["PCA (Principal Component Analysis)"]
+                    default=["PCA (Analisi Componenti Principali)"]
                 )
         
         with col2:
-            st.subheader("Analysis Parameters")
+            st.subheader("Parametri Analisi")
             
-            # Confidence level
+            # Livello di confidenza
             confidence_level = st.slider(
-                "Confidence Level",
+                "Livello di Confidenza",
                 min_value=0.90,
                 max_value=0.99,
                 value=0.95,
                 step=0.01,
-                help="Statistical confidence level for tests"
+                help="Livello di confidenza statistica per i test"
             )
             
-            # Sample size for large datasets
+            # Dimensione campione per dataset grandi
             if st.session_state.data is not None and len(st.session_state.data) > 10000:
                 use_sampling = st.checkbox(
-                    "Use sampling for large dataset",
+                    "Usa campionamento per dataset grande",
                     value=True,
-                    help="Sample data for faster processing"
+                    help="Campiona i dati per elaborazione più veloce"
                 )
                 
                 if use_sampling:
                     sample_size = st.number_input(
-                        "Sample Size",
+                        "Dimensione Campione",
                         min_value=1000,
                         max_value=min(50000, len(st.session_state.data)),
                         value=min(10000, len(st.session_state.data)),
@@ -506,16 +506,16 @@ This dataset contains e-commerce sales data from 2023. I want to:
                 use_sampling = False
                 sample_size = None
             
-            # AI analysis depth
+            # Profondità analisi IA
             ai_depth = st.select_slider(
-                "AI Analysis Depth",
-                options=["Quick", "Standard", "Deep", "Comprehensive"],
+                "Profondità Analisi IA",
+                options=["Veloce", "Standard", "Approfondita", "Completa"],
                 value="Standard",
-                help="Deeper analysis takes more time but provides more insights"
+                help="Analisi più approfondite richiedono più tempo ma forniscono più insight"
             )
             
-            # Store analysis parameters
-            if st.button("Save Analysis Parameters", type="primary"):
+            # Memorizza parametri analisi
+            if st.button("Salva Parametri Analisi", type="primary"):
                 st.session_state.analysis_params = {
                     'context': context_prompt,
                     'analysis_types': analysis_types,
@@ -525,26 +525,26 @@ This dataset contains e-commerce sales data from 2023. I want to:
                     'sample_size': sample_size,
                     'ai_depth': ai_depth
                 }
-                st.success("✅ Analysis parameters saved!")
+                st.success("✅ Parametri analisi salvati!")
     
     def step5_run_analysis(self):
-        """Step 5: Run Analysis"""
-        st.markdown('<div class="step-header">🔬 Step 5: Execute Analysis</div>', 
+        """Passo 5: Esegui Analisi"""
+        st.markdown('<div class="step-header">🔬 Passo 5: Esegui Analisi</div>', 
                    unsafe_allow_html=True)
         
         if (st.session_state.data is not None and 
             st.session_state.ai_manager is not None and
             'analysis_params' in st.session_state):
             
-            if st.button("🚀 Run Comprehensive Analysis", type="primary", use_container_width=True):
+            if st.button("🚀 Esegui Analisi Completa", type="primary", use_container_width=True):
                 
-                # Create progress tracking
+                # Crea tracciamento progresso
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 
                 try:
-                    # Step 1: Data Preprocessing
-                    status_text.text("Step 1/5: Preprocessing data...")
+                    # Passo 1: Preprocessamento Dati
+                    status_text.text("Passo 1/5: Preprocessamento dati...")
                     progress_bar.progress(0.2)
                     
                     processed_data = self.data_processor.process(
@@ -554,8 +554,8 @@ This dataset contains e-commerce sales data from 2023. I want to:
                     )
                     st.session_state.processed_data = processed_data
                     
-                    # Step 2: Statistical Analysis
-                    status_text.text("Step 2/5: Running statistical analysis...")
+                    # Passo 2: Analisi Statistica
+                    status_text.text("Passo 2/5: Esecuzione analisi statistica...")
                     progress_bar.progress(0.4)
                     
                     statistical_results = self.statistical_analyzer.analyze(
@@ -563,8 +563,8 @@ This dataset contains e-commerce sales data from 2023. I want to:
                         st.session_state.analysis_params
                     )
                     
-                    # Step 3: AI Analysis
-                    status_text.text("Step 3/5: Running AI-powered analysis...")
+                    # Passo 3: Analisi IA
+                    status_text.text("Passo 3/5: Esecuzione analisi con IA...")
                     progress_bar.progress(0.6)
                     
                     ai_results = asyncio.run(
@@ -576,8 +576,8 @@ This dataset contains e-commerce sales data from 2023. I want to:
                         )
                     )
                     
-                    # Step 4: Generate Visualizations
-                    status_text.text("Step 4/5: Generating visualizations...")
+                    # Passo 4: Genera Visualizzazioni
+                    status_text.text("Passo 4/5: Generazione visualizzazioni...")
                     progress_bar.progress(0.8)
                     
                     visualizations = self.visualization_engine.create_visualizations(
@@ -586,8 +586,8 @@ This dataset contains e-commerce sales data from 2023. I want to:
                         ai_results
                     )
                     
-                    # Step 5: Compile Results
-                    status_text.text("Step 5/5: Compiling results...")
+                    # Passo 5: Compila Risultati
+                    status_text.text("Passo 5/5: Compilazione risultati...")
                     progress_bar.progress(1.0)
                     
                     st.session_state.analysis_results = {
@@ -597,38 +597,38 @@ This dataset contains e-commerce sales data from 2023. I want to:
                         'timestamp': datetime.now().isoformat()
                     }
                     
-                    status_text.text("✅ Analysis completed successfully!")
-                    st.success("Analysis completed! Navigate to the Results tab to view insights.")
+                    status_text.text("✅ Analisi completata con successo!")
+                    st.success("Analisi completata! Vai alla scheda Risultati per visualizzare gli insight.")
                     
                 except Exception as e:
-                    st.error(f"❌ Error during analysis: {str(e)}")
+                    st.error(f"❌ Errore durante l'analisi: {str(e)}")
                     st.exception(e)
         else:
-            st.warning("⚠️ Please complete all previous steps before running analysis.")
+            st.warning("⚠️ Completa tutti i passaggi precedenti prima di eseguire l'analisi.")
     
     def step6_view_results(self):
-        """Step 6: View and Export Results"""
-        st.markdown('<div class="step-header">📊 Step 6: Analysis Results & Insights</div>', 
+        """Passo 6: Visualizza ed Esporta Risultati"""
+        st.markdown('<div class="step-header">📊 Passo 6: Risultati e Insight dell\'Analisi</div>', 
                    unsafe_allow_html=True)
         
         if st.session_state.analysis_results is not None:
             results = st.session_state.analysis_results
             
-            # Create tabs for different result sections
+            # Crea schede per diverse sezioni dei risultati
             tabs = st.tabs([
-                "📈 Statistical Analysis",
-                "🤖 AI Insights",
-                "📊 Visualizations",
-                "📋 Summary Report",
-                "💾 Export"
+                "📈 Analisi Statistica",
+                "🤖 Insight IA",
+                "📊 Visualizzazioni",
+                "📋 Report Riepilogativo",
+                "💾 Esporta"
             ])
             
-            # Statistical Analysis Tab
+            # Tab Analisi Statistica
             with tabs[0]:
-                st.subheader("Statistical Analysis Results")
+                st.subheader("Risultati Analisi Statistica")
                 
                 if 'descriptive' in results['statistical']:
-                    st.markdown("### Descriptive Statistics")
+                    st.markdown("### Statistiche Descrittive")
                     desc_stats = results['statistical']['descriptive']
                     if isinstance(desc_stats, pd.DataFrame):
                         st.dataframe(desc_stats, use_container_width=True)
@@ -636,34 +636,34 @@ This dataset contains e-commerce sales data from 2023. I want to:
                         st.json(desc_stats)
                 
                 if 'correlations' in results['statistical']:
-                    st.markdown("### Correlation Analysis")
+                    st.markdown("### Analisi delle Correlazioni")
                     corr_data = results['statistical']['correlations']
                     
-                    # Show excluded columns if any
+                    # Mostra colonne escluse se presenti
                     if isinstance(corr_data, dict) and 'columns_excluded' in corr_data and corr_data['columns_excluded']:
-                        with st.expander("ℹ️ Excluded from correlation analysis"):
-                            st.write("The following columns were excluded as they're not meaningful for correlation:")
+                        with st.expander("ℹ️ Escluse dall'analisi delle correlazioni"):
+                            st.write("Le seguenti colonne sono state escluse perché non significative per la correlazione:")
                             excluded_cols = corr_data['columns_excluded']
-                            for col in excluded_cols[:20]:  # Show first 20
+                            for col in excluded_cols[:20]:  # Mostra prime 20
                                 st.write(f"• {col}")
                             if len(excluded_cols) > 20:
-                                st.write(f"... and {len(excluded_cols) - 20} more")
+                                st.write(f"... e altre {len(excluded_cols) - 20}")
                     
-                    # Handle different correlation data formats
+                    # Gestisci diversi formati di dati correlazione
                     if isinstance(corr_data, dict):
-                        # Show significant correlations first
+                        # Mostra prima correlazioni significative
                         if 'significant_correlations' in corr_data and corr_data['significant_correlations']:
-                            st.markdown("#### 🎯 Most Important Correlations")
+                            st.markdown("#### 🎯 Correlazioni Più Importanti")
                             sig_corrs = corr_data['significant_correlations']
                             
-                            # Create a nice display for significant correlations
-                            for i, corr in enumerate(sig_corrs[:10], 1):  # Show top 10
+                            # Crea un display carino per le correlazioni significative
+                            for i, corr in enumerate(sig_corrs[:10], 1):  # Mostra top 10
                                 with st.container():
                                     col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
                                     with col1:
                                         st.write(f"**{i}.** {corr['var1']} ↔ {corr['var2']}")
                                     with col2:
-                                        # Use color coding for correlation strength
+                                        # Usa codifica colori per forza correlazione
                                         if abs(corr['correlation']) > 0.8:
                                             st.write(f"🔴 {corr['strength']}")
                                         elif abs(corr['correlation']) > 0.6:
@@ -680,13 +680,13 @@ This dataset contains e-commerce sales data from 2023. I want to:
                                         elif corr['p_value'] < 0.05:
                                             st.write("*")
                             
-                            st.caption("Significance: *** p<0.001, ** p<0.01, * p<0.05")
+                            st.caption("Significatività: *** p<0.001, ** p<0.01, * p<0.05")
                         
-                        # Show target correlations if available
+                        # Mostra correlazioni target se disponibili
                         if 'target_correlations' in corr_data and corr_data['target_correlations']:
-                            st.markdown("#### 🎯 Target Variable Correlations")
+                            st.markdown("#### 🎯 Correlazioni Variabile Target")
                             for target, correlations in corr_data['target_correlations'].items():
-                                with st.expander(f"Correlations with {target}"):
+                                with st.expander(f"Correlazioni con {target}"):
                                     for corr_item in correlations[:10]:
                                         col1, col2 = st.columns([3, 1])
                                         with col1:
@@ -698,7 +698,7 @@ This dataset contains e-commerce sales data from 2023. I want to:
                                             else:
                                                 st.write(f"↘️ {corr_val:.3f}")
                         
-                        # Show correlation matrix heatmap if available
+                        # Mostra matrice correlazione heatmap se disponibile
                         if 'pearson' in corr_data:
                             corr_matrix = corr_data['pearson']
                         elif 'spearman' in corr_data:
@@ -708,15 +708,15 @@ This dataset contains e-commerce sales data from 2023. I want to:
                     else:
                         corr_matrix = corr_data
                     
-                    # Display correlation heatmap if we have a matrix
+                    # Visualizza heatmap correlazione se abbiamo una matrice
                     if corr_matrix is not None and isinstance(corr_matrix, pd.DataFrame) and not corr_matrix.empty:
-                        with st.expander("View Full Correlation Matrix"):
+                        with st.expander("Visualizza Matrice Correlazione Completa"):
                             try:
-                                # Only show heatmap if not too large
+                                # Mostra heatmap solo se non troppo grande
                                 if len(corr_matrix.columns) <= 30:
                                     fig = px.imshow(
                                         corr_matrix.values,
-                                        labels=dict(x="Variables", y="Variables", color="Correlation"),
+                                        labels=dict(x="Variabili", y="Variabili", color="Correlazione"),
                                         x=corr_matrix.columns.tolist(),
                                         y=corr_matrix.index.tolist(),
                                         color_continuous_scale="RdBu",
@@ -727,78 +727,78 @@ This dataset contains e-commerce sales data from 2023. I want to:
                                     fig.update_layout(height=600)
                                     st.plotly_chart(fig, use_container_width=True)
                                 else:
-                                    st.info(f"Matrix too large ({len(corr_matrix.columns)} variables) for visualization. Showing data table instead.")
+                                    st.info(f"Matrice troppo grande ({len(corr_matrix.columns)} variabili) per visualizzazione. Mostrando tabella dati.")
                                     st.dataframe(corr_matrix.round(3), use_container_width=True)
                             except Exception as e:
-                                st.error(f"Could not display correlation heatmap: {str(e)}")
+                                st.error(f"Impossibile visualizzare heatmap correlazione: {str(e)}")
                                 st.dataframe(corr_matrix.round(3), use_container_width=True)
                 
                 if 'pca_results' in results['statistical']:
-                    st.markdown("### PCA Results")
+                    st.markdown("### Risultati PCA")
                     pca_data = results['statistical']['pca_results']
                     
                     if 'explained_variance' in pca_data:
-                        # Explained variance plot
+                        # Grafico varianza spiegata
                         try:
                             explained_var = pca_data['explained_variance']
                             fig = px.bar(
                                 x=list(range(1, len(explained_var) + 1)),
                                 y=explained_var,
-                                labels={'x': 'Component', 'y': 'Explained Variance'},
-                                title="PCA: Explained Variance by Component"
+                                labels={'x': 'Componente', 'y': 'Varianza Spiegata'},
+                                title="PCA: Varianza Spiegata per Componente"
                             )
                             st.plotly_chart(fig, use_container_width=True)
                         except Exception as e:
-                            st.error(f"Could not display PCA plot: {str(e)}")
+                            st.error(f"Impossibile visualizzare grafico PCA: {str(e)}")
                     
-                    # Component loadings
+                    # Loadings componenti
                     if 'loadings' in pca_data:
-                        st.markdown("#### Component Loadings")
+                        st.markdown("#### Loadings delle Componenti")
                         loadings = pca_data['loadings']
                         if isinstance(loadings, dict):
                             st.json(loadings)
                         else:
                             st.dataframe(loadings, use_container_width=True)
             
-            # AI Insights Tab
+            # Tab Insight IA
             with tabs[1]:
-                st.subheader("AI-Generated Insights")
+                st.subheader("Insight Generati dall'IA")
                 
-                # Check if there were errors
+                # Controlla se ci sono stati errori
                 if 'errors' in results['ai'] and results['ai']['errors']:
-                    st.warning("Some AI agents encountered errors:")
+                    st.warning("Alcuni agenti IA hanno riscontrato errori:")
                     for error in results['ai']['errors']:
                         st.error(f"• {error}")
-                    st.info("Showing available insights from successful agents and statistical analysis:")
+                    st.info("Mostrando insight disponibili dagli agenti funzionanti e dall'analisi statistica:")
                 
-                # Compile all available AI results
+                # Compila tutti i risultati IA disponibili
                 ai_content_found = False
                 
-                # 1. Check for formatted insights
+                # 1. Controlla insight formattati
                 if 'insights' in results['ai'] and results['ai']['insights']:
                     ai_content_found = True
                     insights = results['ai']['insights']
                     
-                    st.markdown("### 📊 Key Insights")
+                    st.markdown("### 📊 Insight Chiave")
                     if isinstance(insights, list):
                         for i, insight in enumerate(insights, 1):
                             if isinstance(insight, dict):
                                 with st.container():
                                     col1, col2 = st.columns([4, 1])
                                     with col1:
-                                        st.markdown(f"**Insight {i}: {insight.get('title', 'Analysis')}**")
+                                        st.markdown(f"**Insight {i}: {insight.get('title', 'Analisi')}**")
                                         st.write(insight.get('description', ''))
                                     with col2:
                                         if 'confidence' in insight:
                                             conf_value = insight['confidence']
                                             if isinstance(conf_value, (int, float)):
                                                 if conf_value <= 1:
-                                                    st.metric("Confidence", f"{conf_value:.0%}")
+                                                    st.metric("Confidenza", f"{conf_value:.0%}")
                                                 else:
-                                                    st.metric("Score", f"{conf_value:.1f}")
+                                                    st.metric("Punteggio", f"{conf_value:.1f}")
                                 
                                 if 'recommendations' in insight:
-                                    with st.expander("View Recommendations"):
+                                    with st.expander("Visualizza Raccomandazioni"):
                                         recs = insight['recommendations']
                                         if isinstance(recs, list):
                                             for rec in recs:
@@ -811,14 +811,14 @@ This dataset contains e-commerce sales data from 2023. I want to:
                     else:
                         st.write(insights)
                 
-                # 2. Check for patterns (even if no insights)
+                # 2. Controlla pattern (anche se nessun insight)
                 if 'patterns' in results['ai'] and results['ai']['patterns']:
                     ai_content_found = True
-                    st.markdown("### 🔍 Discovered Patterns")
+                    st.markdown("### 🔍 Pattern Scoperti")
                     patterns = results['ai']['patterns']
                     
                     if isinstance(patterns, dict):
-                        # If patterns is from the AI response
+                        # Se patterns è dalla risposta IA
                         if 'response' in patterns:
                             st.write(patterns['response'])
                         else:
@@ -828,41 +828,41 @@ This dataset contains e-commerce sales data from 2023. I want to:
                     elif isinstance(patterns, list):
                         for i, pattern in enumerate(patterns, 1):
                             if isinstance(pattern, dict):
-                                with st.expander(f"Pattern {i}: {pattern.get('name', pattern.get('type', 'Discovery'))}"):
+                                with st.expander(f"Pattern {i}: {pattern.get('name', pattern.get('type', 'Scoperta'))}"):
                                     st.write(pattern.get('description', str(pattern)))
                                     if 'significance' in pattern:
-                                        st.metric("Significance", pattern['significance'])
+                                        st.metric("Significatività", pattern['significance'])
                                     if 'details' in pattern:
                                         st.json(pattern['details'])
                             else:
                                 st.write(f"• Pattern {i}: {pattern}")
                 
-                # 3. Check for data exploration results
+                # 3. Controlla risultati esplorazione dati
                 if 'data_exploration' in results['ai'] and results['ai']['data_exploration']:
                     exploration = results['ai']['data_exploration']
                     if exploration and not isinstance(exploration, dict) or (isinstance(exploration, dict) and 'error' not in exploration):
                         ai_content_found = True
-                        st.markdown("### 📈 Data Exploration Findings")
+                        st.markdown("### 📈 Risultati Esplorazione Dati")
                         
                         if isinstance(exploration, dict):
                             if 'response' in exploration:
                                 st.write(exploration['response'])
                             else:
-                                # Try to extract meaningful parts
+                                # Prova a estrarre parti significative
                                 for key, value in exploration.items():
                                     if key not in ['error', 'agent']:
-                                        with st.expander(f"Finding: {key.replace('_', ' ').title()}"):
+                                        with st.expander(f"Scoperta: {key.replace('_', ' ').title()}"):
                                             if isinstance(value, (list, dict)):
                                                 st.json(value)
                                             else:
                                                 st.write(value)
                 
-                # 4. Check for statistical analysis from AI
+                # 4. Controlla analisi statistica da IA
                 if 'statistical_analysis' in results['ai'] and results['ai']['statistical_analysis']:
                     stat_analysis = results['ai']['statistical_analysis']
                     if stat_analysis and not isinstance(stat_analysis, dict) or (isinstance(stat_analysis, dict) and 'error' not in stat_analysis):
                         ai_content_found = True
-                        st.markdown("### 📉 Statistical Analysis Insights")
+                        st.markdown("### 📉 Insight Analisi Statistica")
                         
                         if isinstance(stat_analysis, dict):
                             if 'response' in stat_analysis:
@@ -872,12 +872,12 @@ This dataset contains e-commerce sales data from 2023. I want to:
                                     if key not in ['error', 'agent']:
                                         st.write(f"**{key.replace('_', ' ').title()}:** {value}")
                 
-                # 5. Check for predictive modeling results
+                # 5. Controlla risultati modellazione predittiva
                 if 'predictive_modeling' in results['ai'] and results['ai']['predictive_modeling']:
                     predictive = results['ai']['predictive_modeling']
                     if predictive and not isinstance(predictive, dict) or (isinstance(predictive, dict) and 'error' not in predictive):
                         ai_content_found = True
-                        st.markdown("### 🔮 Predictive Modeling Recommendations")
+                        st.markdown("### 🔮 Raccomandazioni Modellazione Predittiva")
                         
                         if isinstance(predictive, dict):
                             if 'response' in predictive:
@@ -885,43 +885,43 @@ This dataset contains e-commerce sales data from 2023. I want to:
                             else:
                                 st.json(predictive)
                 
-                # 6. Show summary if available
+                # 6. Mostra riepilogo se disponibile
                 if 'summary' in results['ai'] and results['ai']['summary']:
                     ai_content_found = True
-                    st.markdown("### 📝 Analysis Summary")
+                    st.markdown("### 📝 Riepilogo Analisi")
                     st.info(results['ai']['summary'])
                 
-                # 7. Show report if available
+                # 7. Mostra report se disponibile
                 if 'report' in results['ai'] and results['ai']['report']:
                     ai_content_found = True
-                    with st.expander("📄 View Full Report"):
+                    with st.expander("📄 Visualizza Report Completo"):
                         st.markdown(results['ai']['report'])
                 
-                # If no AI content was found, show statistical insights
+                # Se nessun contenuto IA trovato, mostra insight statistici
                 if not ai_content_found:
-                    st.info("AI analysis is processing. Here are statistical insights from your data:")
+                    st.info("L'analisi IA è in elaborazione. Ecco gli insight statistici dai tuoi dati:")
                     
-                    # Show statistical insights
+                    # Mostra insight statistici
                     if 'statistical' in results:
                         if 'significant_correlations' in results['statistical'].get('correlations', {}):
-                            st.markdown("### 🔗 Significant Correlations Found")
+                            st.markdown("### 🔗 Correlazioni Significative Trovate")
                             corrs = results['statistical']['correlations']['significant_correlations']
                             for corr in corrs[:5]:
                                 st.write(f"• **{corr['var1']}** ↔ **{corr['var2']}**: "
-                                        f"{corr['direction']} {corr['strength'].lower()} correlation "
+                                        f"{corr['direction']} correlazione {corr['strength'].lower()} "
                                         f"(r={corr['correlation']:.3f})")
                         
                         if 'outliers' in results['statistical']:
-                            st.markdown("### ⚠️ Outliers Detected")
+                            st.markdown("### ⚠️ Outlier Rilevati")
                             outliers = results['statistical']['outliers']
                             if 'iqr_method' in outliers:
                                 for col, info in outliers['iqr_method'].items():
                                     if info['count'] > 0:
-                                        st.write(f"• **{col}**: {info['count']} outliers ({info['percentage']:.1f}%)")
+                                        st.write(f"• **{col}**: {info['count']} outlier ({info['percentage']:.1f}%)")
                 
-                # Debug section
-                with st.expander("🔧 View Raw AI Responses (Debug)", expanded=False):
-                    debug_tabs = st.tabs(["All Results", "Data Exploration", "Patterns", "Statistical", "Predictive"])
+                # Sezione debug
+                with st.expander("🔧 Visualizza Risposte IA Grezze (Debug)", expanded=False):
+                    debug_tabs = st.tabs(["Tutti i Risultati", "Esplorazione Dati", "Pattern", "Statistica", "Predittiva"])
                     
                     with debug_tabs[0]:
                         st.json(results['ai'])
@@ -930,29 +930,29 @@ This dataset contains e-commerce sales data from 2023. I want to:
                         if 'data_exploration' in results['ai']:
                             st.json(results['ai']['data_exploration'])
                         else:
-                            st.write("No data exploration results")
+                            st.write("Nessun risultato esplorazione dati")
                     
                     with debug_tabs[2]:
                         if 'patterns' in results['ai']:
                             st.json(results['ai']['patterns'])
                         else:
-                            st.write("No pattern results")
+                            st.write("Nessun risultato pattern")
                     
                     with debug_tabs[3]:
                         if 'statistical_analysis' in results['ai']:
                             st.json(results['ai']['statistical_analysis'])
                         else:
-                            st.write("No statistical analysis results")
+                            st.write("Nessun risultato analisi statistica")
                     
                     with debug_tabs[4]:
                         if 'predictive_modeling' in results['ai']:
                             st.json(results['ai']['predictive_modeling'])
                         else:
-                            st.write("No predictive modeling results")
+                            st.write("Nessun risultato modellazione predittiva")
             
-            # Visualizations Tab
+            # Tab Visualizzazioni
             with tabs[2]:
-                st.subheader("Data Visualizations")
+                st.subheader("Visualizzazioni Dati")
                 
                 if 'charts' in results['visualizations'] and results['visualizations']['charts']:
                     for i, chart in enumerate(results['visualizations']['charts']):
@@ -960,61 +960,61 @@ This dataset contains e-commerce sales data from 2023. I want to:
                             try:
                                 st.plotly_chart(chart, use_container_width=True)
                             except Exception as e:
-                                st.error(f"Could not display chart {i+1}: {str(e)}")
+                                st.error(f"Impossibile visualizzare grafico {i+1}: {str(e)}")
                 else:
-                    st.info("No visualizations available. Try running the analysis with more data.")
+                    st.info("Nessuna visualizzazione disponibile. Prova a eseguire l'analisi con più dati.")
             
-            # Summary Report Tab
+            # Tab Report Riepilogativo
             with tabs[3]:
-                st.subheader("Executive Summary Report")
+                st.subheader("Report Riepilogo Esecutivo")
                 
-                # Generate summary report
+                # Genera report riepilogativo
                 try:
                     report = self._generate_summary_report(results)
                     st.markdown(report)
                 except Exception as e:
-                    st.error(f"Could not generate summary report: {str(e)}")
-                    st.info("Showing basic results instead:")
+                    st.error(f"Impossibile generare report riepilogativo: {str(e)}")
+                    st.info("Mostrando risultati di base:")
                     
-                    # Show basic summary
+                    # Mostra riepilogo di base
                     if 'summary' in results['ai']:
-                        st.markdown("### AI Analysis Summary")
+                        st.markdown("### Riepilogo Analisi IA")
                         st.write(results['ai']['summary'])
                     
                     if 'report' in results['ai']:
-                        st.markdown("### Detailed Report")
+                        st.markdown("### Report Dettagliato")
                         st.write(results['ai']['report'])
             
-            # Export Tab
+            # Tab Esporta
             with tabs[4]:
-                st.subheader("Export Results")
+                st.subheader("Esporta Risultati")
                 
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    # Export as Excel
-                    if st.button("📊 Export to Excel", use_container_width=True):
+                    # Esporta come Excel
+                    if st.button("📊 Esporta in Excel", use_container_width=True):
                         try:
                             excel_buffer = self._export_to_excel(results)
                             st.download_button(
-                                label="Download Excel Report",
+                                label="Scarica Report Excel",
                                 data=excel_buffer,
-                                file_name=f"analysis_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                                file_name=f"report_analisi_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                             )
                         except Exception as e:
-                            st.error(f"Could not create Excel export: {str(e)}")
+                            st.error(f"Impossibile creare esportazione Excel: {str(e)}")
                 
                 with col2:
-                    # Export as PDF (placeholder)
-                    if st.button("📄 Export to PDF", use_container_width=True):
-                        st.info("PDF export will be available in the next version")
+                    # Esporta come PDF (placeholder)
+                    if st.button("📄 Esporta in PDF", use_container_width=True):
+                        st.info("Esportazione PDF sarà disponibile nella prossima versione")
                 
                 with col3:
-                    # Export as JSON
-                    if st.button("💾 Export as JSON", use_container_width=True):
+                    # Esporta come JSON
+                    if st.button("💾 Esporta come JSON", use_container_width=True):
                         try:
-                            # Clean results for JSON export
+                            # Pulisci risultati per esportazione JSON
                             clean_results = {}
                             for key, value in results.items():
                                 if isinstance(value, pd.DataFrame):
@@ -1024,161 +1024,161 @@ This dataset contains e-commerce sales data from 2023. I want to:
                             
                             json_data = json.dumps(clean_results, indent=2, default=str)
                             st.download_button(
-                                label="Download JSON Data",
+                                label="Scarica Dati JSON",
                                 data=json_data,
-                                file_name=f"analysis_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                                file_name=f"dati_analisi_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                                 mime="application/json"
                             )
                         except Exception as e:
-                            st.error(f"Could not create JSON export: {str(e)}")
+                            st.error(f"Impossibile creare esportazione JSON: {str(e)}")
         else:
-            st.info("No analysis results available. Please run the analysis first.")
+            st.info("Nessun risultato di analisi disponibile. Esegui prima l'analisi.")
     
     def _generate_summary_report(self, results: Dict) -> str:
-        """Generate a markdown summary report"""
+        """Genera report riepilogativo markdown"""
         report = f"""
-# Data Analysis Report
-**Generated on:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+# Report Analisi Dati
+**Generato il:** {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
 
-## Executive Summary
+## Riepilogo Esecutivo
 """
         
-        # Add AI summary if available
+        # Aggiungi riepilogo IA se disponibile
         if 'ai' in results and 'summary' in results['ai']:
             report += f"{results['ai']['summary']}\n\n"
         else:
-            report += "Analysis completed successfully.\n\n"
+            report += "Analisi completata con successo.\n\n"
         
-        # Add key statistics
+        # Aggiungi statistiche chiave
         if 'statistical' in results:
-            report += "## Statistical Overview\n"
+            report += "## Panoramica Statistica\n"
             
             if 'descriptive' in results['statistical']:
-                report += "✅ Descriptive statistics calculated for all numeric variables.\n"
+                report += "✅ Statistiche descrittive calcolate per tutte le variabili numeriche.\n"
             
             if 'correlations' in results['statistical']:
                 corr_data = results['statistical']['correlations']
                 if isinstance(corr_data, dict) and 'significant_correlations' in corr_data:
                     sig_corrs = corr_data['significant_correlations']
                     if sig_corrs:
-                        report += f"✅ Found {len(sig_corrs)} significant correlations.\n"
+                        report += f"✅ Trovate {len(sig_corrs)} correlazioni significative.\n"
             
             if 'outliers' in results['statistical']:
-                report += "✅ Outlier detection completed.\n"
+                report += "✅ Rilevamento outlier completato.\n"
             
             if 'pca_results' in results['statistical']:
                 pca_data = results['statistical']['pca_results']
                 if 'n_components_95' in pca_data:
-                    report += f"✅ PCA: {pca_data['n_components_95']} components explain 95% of variance.\n"
+                    report += f"✅ PCA: {pca_data['n_components_95']} componenti spiegano il 95% della varianza.\n"
         
-        report += "\n## Key Findings\n"
+        report += "\n## Risultati Chiave\n"
         
-        # Add key insights
+        # Aggiungi insight chiave
         if 'ai' in results and 'insights' in results['ai']:
             insights = results['ai']['insights']
             if isinstance(insights, list):
-                for i, insight in enumerate(insights[:5], 1):  # Top 5 insights
+                for i, insight in enumerate(insights[:5], 1):  # Top 5 insight
                     if isinstance(insight, dict):
-                        report += f"\n### Finding {i}: {insight.get('title', 'Insight')}\n"
+                        report += f"\n### Risultato {i}: {insight.get('title', 'Insight')}\n"
                         report += f"{insight.get('description', '')}\n"
             else:
-                report += "AI analysis provided additional insights.\n"
+                report += "L'analisi IA ha fornito ulteriori insight.\n"
         else:
-            # Fallback to statistical findings
+            # Fallback ai risultati statistici
             if 'statistical' in results and 'correlations' in results['statistical']:
                 corr_data = results['statistical']['correlations']
                 if isinstance(corr_data, dict) and 'significant_correlations' in corr_data:
                     sig_corrs = corr_data['significant_correlations']
                     for i, corr in enumerate(sig_corrs[:3], 1):
-                        report += f"\n### Finding {i}: Correlation detected\n"
-                        report += f"Strong relationship between {corr['var1']} and {corr['var2']} (r={corr['correlation']:.2f})\n"
+                        report += f"\n### Risultato {i}: Correlazione rilevata\n"
+                        report += f"Forte relazione tra {corr['var1']} e {corr['var2']} (r={corr['correlation']:.2f})\n"
         
-        # Add errors if any
+        # Aggiungi errori se presenti
         if 'ai' in results and 'errors' in results['ai'] and results['ai']['errors']:
-            report += "\n## ⚠️ Analysis Notes\n"
-            report += "Some AI agents encountered issues:\n"
+            report += "\n## ⚠️ Note di Analisi\n"
+            report += "Alcuni agenti IA hanno riscontrato problemi:\n"
             for error in results['ai']['errors']:
                 report += f"- {error}\n"
-            report += "\nThe analysis was completed with available agents.\n"
+            report += "\nL'analisi è stata completata con gli agenti disponibili.\n"
         
         return report
     
     def _export_to_excel(self, results: Dict) -> BytesIO:
-        """Export results to Excel file"""
+        """Esporta risultati in file Excel"""
         output = BytesIO()
         
         try:
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                # Export processed data sample
+                # Esporta campione dati processati
                 if st.session_state.processed_data is not None:
                     data_sample = st.session_state.processed_data.head(1000)
-                    data_sample.to_excel(writer, sheet_name='Data Sample', index=False)
+                    data_sample.to_excel(writer, sheet_name='Campione Dati', index=False)
                 
-                # Export descriptive statistics
+                # Esporta statistiche descrittive
                 if 'statistical' in results and 'descriptive' in results['statistical']:
                     desc_stats = results['statistical']['descriptive']
                     if isinstance(desc_stats, pd.DataFrame):
-                        desc_stats.to_excel(writer, sheet_name='Descriptive Stats')
+                        desc_stats.to_excel(writer, sheet_name='Statistiche Descrittive')
                     elif isinstance(desc_stats, dict):
-                        pd.DataFrame(desc_stats).to_excel(writer, sheet_name='Descriptive Stats')
+                        pd.DataFrame(desc_stats).to_excel(writer, sheet_name='Statistiche Descrittive')
                 
-                # Export correlations
+                # Esporta correlazioni
                 if 'statistical' in results and 'correlations' in results['statistical']:
                     corr_data = results['statistical']['correlations']
                     if isinstance(corr_data, dict):
                         if 'pearson' in corr_data and isinstance(corr_data['pearson'], pd.DataFrame):
-                            corr_data['pearson'].to_excel(writer, sheet_name='Correlations')
+                            corr_data['pearson'].to_excel(writer, sheet_name='Correlazioni')
                     elif isinstance(corr_data, pd.DataFrame):
-                        corr_data.to_excel(writer, sheet_name='Correlations')
+                        corr_data.to_excel(writer, sheet_name='Correlazioni')
                 
-                # Export AI insights
+                # Esporta insight IA
                 if 'ai' in results and 'insights' in results['ai']:
                     insights = results['ai']['insights']
                     if isinstance(insights, list) and insights:
                         insights_df = pd.DataFrame(insights)
-                        insights_df.to_excel(writer, sheet_name='AI Insights', index=False)
+                        insights_df.to_excel(writer, sheet_name='Insight IA', index=False)
                 
-                # Add a summary sheet
+                # Aggiungi foglio riepilogo
                 summary_data = {
-                    'Analysis Date': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
-                    'Total Rows': [len(st.session_state.data) if st.session_state.data is not None else 0],
-                    'Total Columns': [len(st.session_state.data.columns) if st.session_state.data is not None else 0],
-                    'AI APIs Used': [', '.join(st.session_state.api_keys.keys()) if st.session_state.api_keys else 'None']
+                    'Data Analisi': [datetime.now().strftime('%d/%m/%Y %H:%M:%S')],
+                    'Righe Totali': [len(st.session_state.data) if st.session_state.data is not None else 0],
+                    'Colonne Totali': [len(st.session_state.data.columns) if st.session_state.data is not None else 0],
+                    'API IA Utilizzate': [', '.join(st.session_state.api_keys.keys()) if st.session_state.api_keys else 'Nessuna']
                 }
-                pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
+                pd.DataFrame(summary_data).to_excel(writer, sheet_name='Riepilogo', index=False)
         
         except Exception as e:
-            logger.error(f"Error creating Excel export: {str(e)}")
-            # Create a simple error report
+            logger.error(f"Errore nella creazione export Excel: {str(e)}")
+            # Crea un semplice report errore
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                error_df = pd.DataFrame({'Error': [str(e)], 'Time': [datetime.now()]})
-                error_df.to_excel(writer, sheet_name='Error Report', index=False)
+                error_df = pd.DataFrame({'Errore': [str(e)], 'Ora': [datetime.now()]})
+                error_df.to_excel(writer, sheet_name='Report Errore', index=False)
         
         output.seek(0)
         return output
     
     def _export_to_pdf(self, results: Dict) -> BytesIO:
-        """Export results to PDF file"""
-        # This would require additional libraries like reportlab
-        # For now, return a placeholder
+        """Esporta risultati in file PDF"""
+        # Richiederebbe librerie aggiuntive come reportlab
+        # Per ora, ritorna un placeholder
         output = BytesIO()
-        output.write(b"PDF export functionality to be implemented")
+        output.write(b"Funzionalità esportazione PDF da implementare")
         output.seek(0)
         return output
     
     def run(self):
-        """Main application runner"""
-        # Render header
+        """Runner principale dell'applicazione"""
+        # Visualizza intestazione
         self.render_header()
         
-        # Create tabs for workflow
+        # Crea schede per il workflow
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-            "1️⃣ API Setup",
-            "2️⃣ Data Upload",
-            "3️⃣ Column Mapping",
-            "4️⃣ Context",
-            "5️⃣ Run Analysis",
-            "6️⃣ Results"
+            "1️⃣ Setup API",
+            "2️⃣ Caricamento Dati",
+            "3️⃣ Mappatura Colonne",
+            "4️⃣ Contesto",
+            "5️⃣ Esegui Analisi",
+            "6️⃣ Risultati"
         ])
         
         with tab1:
@@ -1199,48 +1199,48 @@ This dataset contains e-commerce sales data from 2023. I want to:
         with tab6:
             self.step6_view_results()
         
-        # Sidebar for quick navigation and info
+        # Sidebar per navigazione rapida e info
         with st.sidebar:
-            st.markdown("## 📊 Quick Stats")
+            st.markdown("## 📊 Statistiche Rapide")
             
             if st.session_state.data is not None:
-                st.metric("Dataset Size", f"{len(st.session_state.data):,} rows")
+                st.metric("Dimensione Dataset", f"{len(st.session_state.data):,} righe")
                 st.metric("Features", len(st.session_state.data.columns))
                 
-                # Data types distribution
-                st.markdown("### Data Types")
+                # Distribuzione tipi di dati
+                st.markdown("### Tipi di Dati")
                 dtype_counts = st.session_state.data.dtypes.value_counts()
                 for dtype, count in dtype_counts.items():
                     st.write(f"• {dtype}: {count}")
             
             st.markdown("---")
-            st.markdown("### 🔗 Resources")
-            st.markdown("[Documentation](https://github.com/yourusername/ai-data-analysis)")
-            st.markdown("[Report Issues](https://github.com/yourusername/ai-data-analysis/issues)")
+            st.markdown("### 🔗 Risorse")
+            st.markdown("[Documentazione](https://github.com/yourusername/ai-data-analysis)")
+            st.markdown("[Segnala Problemi](https://github.com/yourusername/ai-data-analysis/issues)")
             
             st.markdown("---")
-            st.markdown("### ⚙️ Settings")
+            st.markdown("### ⚙️ Impostazioni")
             
-            # Theme selector
+            # Selettore tema
             theme = st.selectbox(
-                "Color Theme",
-                ["Default", "Dark", "Light"],
-                help="Select application theme"
+                "Tema Colore",
+                ["Default", "Scuro", "Chiaro"],
+                help="Seleziona tema applicazione"
             )
             
-            # Auto-save option
+            # Opzione salvataggio automatico
             auto_save = st.checkbox(
-                "Auto-save results",
+                "Salvataggio automatico risultati",
                 value=True,
-                help="Automatically save analysis results"
+                help="Salva automaticamente i risultati dell'analisi"
             )
             
-            # Clear cache button
-            if st.button("Clear Cache", use_container_width=True):
+            # Pulsante pulizia cache
+            if st.button("Pulisci Cache", use_container_width=True):
                 st.session_state.cache.clear()
-                st.success("Cache cleared!")
+                st.success("Cache pulita!")
 
-# Main execution
+# Esecuzione principale
 if __name__ == "__main__":
     app = AIDataAnalysisApp()
     app.run()
