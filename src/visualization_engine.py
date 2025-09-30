@@ -1,6 +1,6 @@
 """
-Modulo Engine di Visualizzazione - Versione Italiana
-Crea visualizzazioni interattive usando Plotly
+Visualization Engine Module - FIXED VERSION
+Creates interactive visualizations using Plotly
 """
 
 import plotly.express as px
@@ -14,7 +14,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class VisualizationEngine:
-    """Crea visualizzazioni interattive per i risultati dell'analisi"""
+    """Creates interactive visualizations for analysis results"""
     
     def __init__(self):
         self.color_palette = px.colors.qualitative.Set2
@@ -23,62 +23,62 @@ class VisualizationEngine:
     def create_visualizations(self, data: pd.DataFrame, 
                             statistical_results: Dict,
                             ai_results: Dict) -> Dict:
-        """Crea visualizzazioni complete"""
+        """Create comprehensive visualizations"""
         visualizations = {'charts': []}
         
         try:
-            # 1. Grafici di distribuzione
+            # 1. Distribution plots
             dist_charts = self._create_distribution_plots(data)
             visualizations['charts'].extend(dist_charts)
         except Exception as e:
-            logger.error(f"Errore creazione grafici distribuzione: {str(e)}")
+            logger.error(f"Error creating distribution plots: {str(e)}")
         
         try:
-            # 2. Heatmap correlazioni
+            # 2. Correlation heatmap
             if 'correlations' in statistical_results:
                 corr_chart = self._create_correlation_heatmap(statistical_results['correlations'])
                 if corr_chart:
                     visualizations['charts'].append(corr_chart)
         except Exception as e:
-            logger.error(f"Errore creazione heatmap correlazioni: {str(e)}")
+            logger.error(f"Error creating correlation heatmap: {str(e)}")
         
         try:
-            # 3. Visualizzazione PCA
+            # 3. PCA visualization
             if 'pca_results' in statistical_results:
                 pca_charts = self._create_pca_visualizations(statistical_results['pca_results'])
                 visualizations['charts'].extend(pca_charts)
         except Exception as e:
-            logger.error(f"Errore creazione visualizzazioni PCA: {str(e)}")
+            logger.error(f"Error creating PCA visualizations: {str(e)}")
         
         try:
-            # 4. Grafici serie temporali
+            # 4. Time series plots
             if 'time_series' in statistical_results:
                 ts_charts = self._create_time_series_plots(data, statistical_results['time_series'])
                 visualizations['charts'].extend(ts_charts)
         except Exception as e:
-            logger.error(f"Errore creazione grafici serie temporali: {str(e)}")
+            logger.error(f"Error creating time series plots: {str(e)}")
         
         try:
-            # 5. Visualizzazione clustering
+            # 5. Clustering visualization
             if 'clustering' in statistical_results:
                 cluster_charts = self._create_clustering_plots(statistical_results['clustering'])
                 visualizations['charts'].extend(cluster_charts)
         except Exception as e:
-            logger.error(f"Errore creazione grafici clustering: {str(e)}")
+            logger.error(f"Error creating clustering plots: {str(e)}")
         
         return visualizations
     
     def _create_distribution_plots(self, data: pd.DataFrame) -> List:
-        """Crea grafici di distribuzione per colonne numeriche"""
+        """Create distribution plots for numeric columns"""
         charts = []
         numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
         
-        # Crea subplot per le prime 6 colonne numeriche
+        # Create subplot for first 6 numeric columns
         if len(numeric_cols) > 0:
             n_cols = min(6, len(numeric_cols))
             fig = make_subplots(
                 rows=2, cols=3,
-                subplot_titles=[f'Distribuzione di {col}' for col in numeric_cols[:n_cols]]
+                subplot_titles=[f'Distribution of {col}' for col in numeric_cols[:n_cols]]
             )
             
             for i, col in enumerate(numeric_cols[:n_cols]):
@@ -91,7 +91,7 @@ class VisualizationEngine:
                 )
             
             fig.update_layout(
-                title_text="Distribuzioni dei Dati",
+                title_text="Data Distributions",
                 showlegend=False,
                 height=600,
                 template=self.template
@@ -102,9 +102,9 @@ class VisualizationEngine:
         return charts
     
     def _create_correlation_heatmap(self, correlations: Any) -> go.Figure:
-        """Crea heatmap delle correlazioni"""
+        """Create correlation heatmap"""
         if isinstance(correlations, dict):
-            # Usa correlazioni Pearson se disponibili
+            # Use Pearson correlations if available
             corr_matrix = correlations.get('pearson', pd.DataFrame())
         else:
             corr_matrix = correlations
@@ -119,11 +119,11 @@ class VisualizationEngine:
                 text=corr_matrix.values.round(2),
                 texttemplate='%{text}',
                 textfont={"size": 10},
-                colorbar=dict(title="Correlazione")
+                colorbar=dict(title="Correlation")
             ))
             
             fig.update_layout(
-                title="Matrice di Correlazione",
+                title="Correlation Matrix",
                 height=600,
                 template=self.template
             )
@@ -133,7 +133,7 @@ class VisualizationEngine:
         return None
     
     def _create_pca_visualizations(self, pca_results: Dict) -> List:
-        """Crea visualizzazioni PCA"""
+        """Create PCA visualizations"""
         charts = []
         
         if 'components' in pca_results and 'explained_variance_ratio' in pca_results:
@@ -146,7 +146,7 @@ class VisualizationEngine:
             fig.add_trace(go.Bar(
                 x=list(range(1, len(variance_ratios) + 1)),
                 y=variance_ratios,
-                name='Individuale',
+                name='Individual',
                 marker_color='lightblue'
             ))
             
@@ -154,30 +154,30 @@ class VisualizationEngine:
                 x=list(range(1, len(variance_ratios) + 1)),
                 y=cumulative_variance,
                 mode='lines+markers',
-                name='Cumulativa',
+                name='Cumulative',
                 marker_color='red'
             ))
             
             fig.update_layout(
-                title='PCA: Varianza Spiegata',
-                xaxis_title='Componente Principale',
-                yaxis_title='Rapporto Varianza Spiegata',
+                title='PCA: Explained Variance',
+                xaxis_title='Principal Component',
+                yaxis_title='Explained Variance Ratio',
                 template=self.template,
                 height=400
             )
             
             charts.append(fig)
             
-            # Grafico componenti principali (se disponibili dati trasformati)
+            # Component loadings plot (if transformed data available)
             if 'transformed_data' in pca_results:
                 transformed = pca_results['transformed_data']
                 
                 fig = px.scatter(
                     x=transformed[:, 0] if transformed.shape[1] > 0 else [],
                     y=transformed[:, 1] if transformed.shape[1] > 1 else [],
-                    title='PCA: Prime Due Componenti',
-                    labels={'x': 'Prima Componente Principale', 
-                           'y': 'Seconda Componente Principale'},
+                    title='PCA: First Two Components',
+                    labels={'x': 'First Principal Component', 
+                           'y': 'Second Principal Component'},
                     template=self.template,
                     height=500
                 )
@@ -187,20 +187,20 @@ class VisualizationEngine:
         return charts
     
     def _create_time_series_plots(self, data: pd.DataFrame, ts_results: Dict) -> List:
-        """Crea visualizzazioni serie temporali - VERSIONE CORRETTA"""
+        """Create time series visualizations - FIXED VERSION"""
         charts = []
         
-        # Grafici serie temporali per ogni colonna analizzata
-        for col, results in list(ts_results.items())[:3]:  # Limite a 3 grafici
+        # Time series plots for each analyzed column
+        for col, results in list(ts_results.items())[:3]:  # Limit to 3 plots
             if col in data.columns:
                 try:
                     fig = go.Figure()
                     
-                    # FIX: Converti range in lista per compatibilità con Plotly
+                    # FIX: Convert range to list for Plotly compatibility
                     if isinstance(data.index, pd.DatetimeIndex):
                         x_values = data.index
                     else:
-                        # Converti range in lista
+                        # Convert range to list
                         x_values = list(range(len(data)))
                     
                     fig.add_trace(go.Scatter(
@@ -210,19 +210,19 @@ class VisualizationEngine:
                         name=col
                     ))
                     
-                    # Aggiungi linea di tendenza se disponibile
+                    # Add trend line if available
                     if 'trend' in results and results['trend'] is not None:
                         fig.add_trace(go.Scatter(
                             x=x_values,
                             y=results['trend'],
                             mode='lines',
-                            name=f'{col} - Tendenza',
+                            name=f'{col} - Trend',
                             line=dict(dash='dash')
                         ))
                     
                     fig.update_layout(
-                        title=f'Serie Temporale: {col}',
-                        xaxis_title='Tempo' if isinstance(data.index, pd.DatetimeIndex) else 'Indice',
+                        title=f'Time Series: {col}',
+                        xaxis_title='Time' if isinstance(data.index, pd.DatetimeIndex) else 'Index',
                         yaxis_title=col,
                         template=self.template,
                         height=400
@@ -230,55 +230,55 @@ class VisualizationEngine:
                     
                     charts.append(fig)
                 except Exception as e:
-                    logger.error(f"Errore creazione grafico serie temporale per {col}: {str(e)}")
+                    logger.error(f"Error creating time series plot for {col}: {str(e)}")
                     continue
         
         return charts
     
     def _create_clustering_plots(self, clustering_results: Dict) -> List:
-        """Crea visualizzazioni clustering"""
+        """Create clustering visualizations"""
         charts = []
         
-        # Grafico gomito per K-means
+        # Elbow plot for K-means
         if 'kmeans' in clustering_results:
             kmeans_data = clustering_results['kmeans']
             
             if 'inertias' in kmeans_data and 'silhouette_scores' in kmeans_data:
                 fig = make_subplots(
                     rows=1, cols=2,
-                    subplot_titles=['Metodo del Gomito', 'Punteggio Silhouette']
+                    subplot_titles=['Elbow Method', 'Silhouette Score']
                 )
                 
-                # Grafico gomito
+                # Elbow plot
                 k_values = list(range(2, 2 + len(kmeans_data['inertias'])))
                 fig.add_trace(
                     go.Scatter(
                         x=k_values,
                         y=kmeans_data['inertias'],
                         mode='lines+markers',
-                        name='Inerzia'
+                        name='Inertia'
                     ),
                     row=1, col=1
                 )
                 
-                # Grafico silhouette
+                # Silhouette plot
                 fig.add_trace(
                     go.Scatter(
                         x=k_values,
                         y=kmeans_data['silhouette_scores'],
                         mode='lines+markers',
-                        name='Punteggio Silhouette'
+                        name='Silhouette Score'
                     ),
                     row=1, col=2
                 )
                 
-                fig.update_xaxes(title_text="Numero di Cluster", row=1, col=1)
-                fig.update_xaxes(title_text="Numero di Cluster", row=1, col=2)
-                fig.update_yaxes(title_text="Inerzia", row=1, col=1)
-                fig.update_yaxes(title_text="Punteggio", row=1, col=2)
+                fig.update_xaxes(title_text="Number of Clusters", row=1, col=1)
+                fig.update_xaxes(title_text="Number of Clusters", row=1, col=2)
+                fig.update_yaxes(title_text="Inertia", row=1, col=1)
+                fig.update_yaxes(title_text="Score", row=1, col=2)
                 
                 fig.update_layout(
-                    title_text="Analisi Clustering K-Means",
+                    title_text="K-Means Clustering Analysis",
                     showlegend=False,
                     height=400,
                     template=self.template
@@ -291,7 +291,7 @@ class VisualizationEngine:
     def create_custom_chart(self, chart_type: str, data: pd.DataFrame, 
                            x_col: str = None, y_col: str = None, 
                            color_col: str = None, **kwargs) -> go.Figure:
-        """Crea grafici personalizzati basati sulle preferenze utente"""
+        """Create custom charts based on user preferences"""
         try:
             if chart_type == 'scatter':
                 fig = px.scatter(data, x=x_col, y=y_col, color=color_col, 
@@ -309,18 +309,18 @@ class VisualizationEngine:
                 fig = px.violin(data, x=x_col, y=y_col, color=color_col,
                               template=self.template, **kwargs)
             else:
-                raise ValueError(f"Tipo di grafico non supportato: {chart_type}")
+                raise ValueError(f"Unsupported chart type: {chart_type}")
             
             return fig
         except Exception as e:
-            logger.error(f"Errore creazione grafico personalizzato: {str(e)}")
+            logger.error(f"Error creating custom chart: {str(e)}")
             return None
     
     def create_ai_insights_visualization(self, ai_results: Dict) -> List:
-        """Crea visualizzazioni per gli insights AI"""
+        """Create visualizations for AI insights"""
         charts = []
         
-        # Crea grafici per i risultati dei diversi agenti AI
+        # Create charts for different AI agents' results
         for agent_name, results in ai_results.items():
             if isinstance(results, dict) and 'visualizations' in results:
                 for viz in results['visualizations']:
@@ -330,15 +330,15 @@ class VisualizationEngine:
                             if chart:
                                 charts.append(chart)
                     except Exception as e:
-                        logger.error(f"Errore creazione visualizzazione AI: {str(e)}")
+                        logger.error(f"Error creating AI visualization: {str(e)}")
         
         return charts
     
     def _create_chart_from_spec(self, spec: Dict) -> go.Figure:
-        """Crea grafico da specifica generata dall'AI"""
+        """Create chart from AI-generated specification"""
         chart_type = spec.get('type')
         data = spec.get('data')
-        title = spec.get('title', 'Grafico Generato da AI')
+        title = spec.get('title', 'AI Generated Chart')
         
         if chart_type == 'bar':
             fig = go.Figure(data=[
@@ -361,4 +361,4 @@ class VisualizationEngine:
             height=400
         )
         
-        return fig  # Corretto: questa funzione ritorna un singolo Figure
+        return fig
