@@ -1,6 +1,6 @@
 """
-AI Agents Manager Module
-Handles multiple specialized AI agents for different analysis tasks
+Modulo Gestore Agenti IA
+Gestisce agenti IA specializzati multipli per diversi compiti di analisi
 """
 
 import asyncio
@@ -17,46 +17,46 @@ import tiktoken
 from tenacity import retry, stop_after_attempt, wait_exponential
 import logging
 
-# Configure logging
+# Configura logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class AgentRole(Enum):
-    """Enumeration of AI agent roles"""
-    DATA_EXPLORER = "data_explorer"
-    PATTERN_DETECTOR = "pattern_detector"
-    STATISTICAL_ANALYST = "statistical_analyst"
-    PREDICTIVE_MODELER = "predictive_modeler"
-    INSIGHT_GENERATOR = "insight_generator"
-    REPORT_WRITER = "report_writer"
+    """Enumerazione dei ruoli degli agenti IA"""
+    DATA_EXPLORER = "esploratore_dati"
+    PATTERN_DETECTOR = "rilevatore_pattern"
+    STATISTICAL_ANALYST = "analista_statistico"
+    PREDICTIVE_MODELER = "modellatore_predittivo"
+    INSIGHT_GENERATOR = "generatore_insight"
+    REPORT_WRITER = "scrittore_report"
 
 @dataclass
 class AIAgent:
-    """Individual AI Agent configuration"""
+    """Configurazione singolo agente IA"""
     name: str
     role: AgentRole
     model: str
-    provider: str  # 'openai' or 'claude'
+    provider: str  # 'openai' o 'claude'
     temperature: float
     max_tokens: int
     system_prompt: str
     
 class AIAgentManager:
-    """Manages multiple AI agents for comprehensive data analysis"""
+    """Gestisce agenti IA multipli per analisi dati completa"""
     
     def __init__(self, api_keys: Dict[str, str]):
         self.api_keys = api_keys
         self.agents = self._initialize_agents()
         
-        # Initialize API clients
+        # Inizializza client API
         if 'openai' in api_keys:
             try:
-                # Try new OpenAI client (>=1.0.0)
+                # Prova nuovo client OpenAI (>=1.0.0)
                 from openai import OpenAI
                 self.openai_client = OpenAI(api_key=api_keys['openai'])
                 self.openai_legacy = False
             except ImportError:
-                # Fall back to legacy client
+                # Fallback al client legacy
                 import openai
                 openai.api_key = api_keys['openai']
                 self.openai_client = openai
@@ -65,14 +65,14 @@ class AIAgentManager:
         if 'claude' in api_keys:
             self.anthropic_client = Anthropic(api_key=api_keys['claude'])
         
-        # Token counter for OpenAI
+        # Contatore token per OpenAI
         try:
             self.encoding = tiktoken.get_encoding("cl100k_base")
         except:
             self.encoding = None
     
     def _initialize_agents(self) -> Dict[AgentRole, AIAgent]:
-        """Initialize specialized AI agents"""
+        """Inizializza agenti IA specializzati"""
         agents = {}
         
         # Determina quale provider è disponibile
@@ -81,7 +81,7 @@ class AIAgentManager:
         
         # Se non c'è nessun provider, ritorna dizionario vuoto
         if not has_openai and not has_claude:
-            logger.warning("No API providers available")
+            logger.warning("Nessun provider API disponibile")
             return agents
         
         # Imposta i provider di default per ogni agente basandosi su cosa è disponibile
@@ -89,170 +89,170 @@ class AIAgentManager:
         default_openai_model = self.api_keys.get('openai_model', 'gpt-4-turbo')
         default_claude_model = self.api_keys.get('claude_model', 'claude-3-5-sonnet-20241022')
         
-        # Data Explorer Agent
+        # Agente Esploratore Dati
         if has_claude or has_openai:
             agents[AgentRole.DATA_EXPLORER] = AIAgent(
-                name="Data Explorer",
+                name="Esploratore Dati",
                 role=AgentRole.DATA_EXPLORER,
                 model=default_claude_model if has_claude else default_openai_model,
                 provider='claude' if has_claude else 'openai',
                 temperature=0.3,
                 max_tokens=4000,
-                system_prompt="""You are a specialized data exploration agent with deep expertise in:
-                - Identifying data types, distributions, and quality issues
-                - Detecting anomalies and outliers using statistical methods
-                - Understanding relationships between variables
-                - Providing actionable data cleaning recommendations
+                system_prompt="""Sei un agente specializzato nell'esplorazione dei dati con competenze approfondite in:
+                - Identificazione di tipi di dati, distribuzioni e problemi di qualità
+                - Rilevamento di anomalie e outlier usando metodi statistici
+                - Comprensione delle relazioni tra variabili
+                - Fornire raccomandazioni pratiche per la pulizia dei dati
                 
-                Analyze the provided dataset and return structured insights in JSON format with:
-                1. Data quality assessment
-                2. Distribution characteristics
-                3. Anomaly detection results
-                4. Relationship patterns
-                5. Recommended preprocessing steps"""
+                Analizza il dataset fornito e restituisci insight strutturati in formato JSON con:
+                1. Valutazione qualità dei dati
+                2. Caratteristiche delle distribuzioni
+                3. Risultati rilevamento anomalie
+                4. Pattern di relazioni
+                5. Passi di preprocessamento raccomandati"""
             )
         
-        # Pattern Detector Agent
+        # Agente Rilevatore Pattern
         if has_openai or has_claude:
             agents[AgentRole.PATTERN_DETECTOR] = AIAgent(
-                name="Pattern Detector",
+                name="Rilevatore Pattern",
                 role=AgentRole.PATTERN_DETECTOR,
                 model=default_openai_model if has_openai else default_claude_model,
                 provider='openai' if has_openai else 'claude',
                 temperature=0.5,
                 max_tokens=4000,
-                system_prompt="""You are an advanced pattern detection specialist focused on:
-                - Identifying recurring patterns and cycles in data
-                - Detecting seasonal trends and periodicities
-                - Finding hidden correlations and dependencies
-                - Discovering segment patterns and clusters
-                - Recognizing anomalous pattern breaks
+                system_prompt="""Sei uno specialista avanzato nel rilevamento di pattern focalizzato su:
+                - Identificare pattern ricorrenti e cicli nei dati
+                - Rilevare trend stagionali e periodicità
+                - Trovare correlazioni e dipendenze nascoste
+                - Scoprire pattern di segmenti e cluster
+                - Riconoscere interruzioni di pattern anomale
                 
-                Use advanced statistical techniques including:
-                - Fourier analysis for periodicity detection
-                - Autocorrelation for time dependencies
-                - Cross-correlation for relationship discovery
-                - Change point detection algorithms
+                Usa tecniche statistiche avanzate incluse:
+                - Analisi di Fourier per rilevamento periodicità
+                - Autocorrelazione per dipendenze temporali
+                - Cross-correlazione per scoperta di relazioni
+                - Algoritmi di rilevamento punti di cambiamento
                 
-                Return findings as structured JSON with pattern descriptions, significance scores, and visualizations recommendations."""
+                Restituisci i risultati come JSON strutturato con descrizioni dei pattern, punteggi di significatività e raccomandazioni per visualizzazioni."""
             )
         
-        # Statistical Analyst Agent
+        # Agente Analista Statistico
         if has_openai or has_claude:
             agents[AgentRole.STATISTICAL_ANALYST] = AIAgent(
-                name="Statistical Analyst",
+                name="Analista Statistico",
                 role=AgentRole.STATISTICAL_ANALYST,
                 model=default_openai_model if has_openai else default_claude_model,
                 provider='openai' if has_openai else 'claude',
                 temperature=0.2,
                 max_tokens=4000,
-                system_prompt="""You are an expert statistical analyst with proficiency in:
-                - Hypothesis testing and significance analysis
-                - Multivariate statistical methods (PCA, FAMD, Factor Analysis)
-                - Time series analysis (ARIMA, seasonal decomposition)
-                - Regression analysis (linear, logistic, polynomial)
-                - Bayesian inference and probabilistic modeling
+                system_prompt="""Sei un analista statistico esperto competente in:
+                - Test di ipotesi e analisi di significatività
+                - Metodi statistici multivariati (PCA, FAMD, Analisi Fattoriale)
+                - Analisi serie temporali (ARIMA, decomposizione stagionale)
+                - Analisi di regressione (lineare, logistica, polinomiale)
+                - Inferenza Bayesiana e modellazione probabilistica
                 
-                Perform rigorous statistical analysis and provide:
-                1. Statistical test results with p-values and confidence intervals
-                2. Effect sizes and practical significance
-                3. Model diagnostics and assumptions validation
-                4. Interpretation of complex statistical outputs
+                Esegui analisi statistica rigorosa e fornisci:
+                1. Risultati test statistici con p-value e intervalli di confidenza
+                2. Dimensioni dell'effetto e significatività pratica
+                3. Diagnostica dei modelli e validazione delle assunzioni
+                4. Interpretazione di output statistici complessi
                 
-                Format results as structured JSON with clear interpretations for non-technical stakeholders."""
+                Formatta i risultati come JSON strutturato con interpretazioni chiare per stakeholder non tecnici."""
             )
         
-        # Predictive Modeler Agent
+        # Agente Modellatore Predittivo
         if has_claude or has_openai:
             agents[AgentRole.PREDICTIVE_MODELER] = AIAgent(
-                name="Predictive Modeler",
+                name="Modellatore Predittivo",
                 role=AgentRole.PREDICTIVE_MODELER,
                 model=default_claude_model if has_claude else default_openai_model,
                 provider='claude' if has_claude else 'openai',
                 temperature=0.4,
                 max_tokens=4000,
-                system_prompt="""You are a machine learning expert specializing in:
-                - Feature engineering and selection
-                - Model selection and hyperparameter tuning
-                - Ensemble methods and model stacking
-                - Time series forecasting
-                - Classification and regression tasks
+                system_prompt="""Sei un esperto di machine learning specializzato in:
+                - Feature engineering e selezione
+                - Selezione modelli e tuning iperparametri
+                - Metodi ensemble e model stacking
+                - Previsioni serie temporali
+                - Task di classificazione e regressione
                 
-                Analyze the data to:
-                1. Recommend appropriate predictive models
-                2. Identify key predictive features
-                3. Suggest target variables for prediction
-                4. Provide forecast scenarios with confidence intervals
-                5. Explain model predictions in business terms
+                Analizza i dati per:
+                1. Raccomandare modelli predittivi appropriati
+                2. Identificare feature predittive chiave
+                3. Suggerire variabili target per la previsione
+                4. Fornire scenari di previsione con intervalli di confidenza
+                5. Spiegare le previsioni dei modelli in termini di business
                 
-                Return structured recommendations with model performance metrics and implementation guidelines."""
+                Restituisci raccomandazioni strutturate con metriche di performance dei modelli e linee guida di implementazione."""
             )
         
-        # Insight Generator Agent
+        # Agente Generatore Insight
         if has_openai or has_claude:
             agents[AgentRole.INSIGHT_GENERATOR] = AIAgent(
-                name="Insight Generator",
+                name="Generatore Insight",
                 role=AgentRole.INSIGHT_GENERATOR,
                 model=default_openai_model if has_openai else default_claude_model,
                 provider='openai' if has_openai else 'claude',
                 temperature=0.7,
                 max_tokens=4000,
-                system_prompt="""You are a business intelligence expert who transforms data findings into actionable insights:
-                - Connect statistical findings to business impact
-                - Generate strategic recommendations
-                - Identify opportunities and risks
-                - Provide competitive intelligence perspectives
-                - Create actionable next steps
+                system_prompt="""Sei un esperto di business intelligence che trasforma i risultati dei dati in insight azionabili:
+                - Connettere risultati statistici all'impatto sul business
+                - Generare raccomandazioni strategiche
+                - Identificare opportunità e rischi
+                - Fornire prospettive di intelligence competitiva
+                - Creare prossimi passi azionabili
                 
-                Synthesize all analysis results to produce:
-                1. Executive-level insights with business implications
-                2. Strategic recommendations with priority scores
-                3. Risk assessments and mitigation strategies
-                4. Opportunity identification with ROI estimates
-                5. Action plans with timelines
+                Sintetizza tutti i risultati dell'analisi per produrre:
+                1. Insight a livello esecutivo con implicazioni di business
+                2. Raccomandazioni strategiche con punteggi di priorità
+                3. Valutazioni del rischio e strategie di mitigazione
+                4. Identificazione opportunità con stime ROI
+                5. Piani d'azione con tempistiche
                 
-                Format as structured JSON optimized for decision-making."""
+                Formatta come JSON strutturato ottimizzato per il decision-making."""
             )
         
-        # Report Writer Agent
+        # Agente Scrittore Report
         if has_claude or has_openai:
             agents[AgentRole.REPORT_WRITER] = AIAgent(
-                name="Report Writer",
+                name="Scrittore Report",
                 role=AgentRole.REPORT_WRITER,
                 model=default_claude_model if has_claude else default_openai_model,
                 provider='claude' if has_claude else 'openai',
                 temperature=0.5,
                 max_tokens=8000,
-                system_prompt="""You are an expert technical writer specializing in data analysis reports:
-                - Create clear, concise executive summaries
-                - Explain complex findings in accessible language
-                - Structure reports for maximum impact
-                - Include relevant visualizations and their interpretations
-                - Provide comprehensive methodology documentation
+                system_prompt="""Sei uno scrittore tecnico esperto specializzato in report di analisi dati:
+                - Creare riepiloghi esecutivi chiari e concisi
+                - Spiegare risultati complessi in linguaggio accessibile
+                - Strutturare report per massimo impatto
+                - Includere visualizzazioni rilevanti e loro interpretazioni
+                - Fornire documentazione metodologica completa
                 
-                Generate professional reports including:
-                1. Executive summary with key takeaways
-                2. Methodology and approach explanation
-                3. Detailed findings with supporting evidence
-                4. Conclusions and recommendations
-                5. Technical appendix for advanced users
+                Genera report professionali includendo:
+                1. Riepilogo esecutivo con punti chiave
+                2. Spiegazione della metodologia e approccio
+                3. Risultati dettagliati con evidenze di supporto
+                4. Conclusioni e raccomandazioni
+                5. Appendice tecnica per utenti avanzati
                 
-                Use markdown formatting for clarity and professional presentation."""
+                Usa formattazione markdown per chiarezza e presentazione professionale."""
             )
         
         return agents
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def _call_openai_agent(self, agent: AIAgent, prompt: str, data_context: str) -> Dict:
-        """Call OpenAI API with retry logic"""
+        """Chiama API OpenAI con logica di retry"""
         try:
             messages = [
                 {"role": "system", "content": agent.system_prompt},
-                {"role": "user", "content": f"Data Context:\n{data_context}\n\nAnalysis Request:\n{prompt}"}
+                {"role": "user", "content": f"Contesto Dati:\n{data_context}\n\nRichiesta Analisi:\n{prompt}"}
             ]
             
             if not self.openai_legacy:
-                # Use new OpenAI client (>=1.0.0)
+                # Usa nuovo client OpenAI (>=1.0.0)
                 response = await asyncio.to_thread(
                     self.openai_client.chat.completions.create,
                     model=agent.model,
@@ -263,7 +263,7 @@ class AIAgentManager:
                 )
                 content = response.choices[0].message.content
             else:
-                # Use legacy OpenAI client
+                # Usa client OpenAI legacy
                 response = await asyncio.to_thread(
                     self.openai_client.ChatCompletion.create,
                     model=agent.model,
@@ -273,7 +273,7 @@ class AIAgentManager:
                 )
                 content = response.choices[0].message.content
             
-            # Try to parse as JSON if expected
+            # Prova a parsare come JSON se previsto
             if "json" in agent.system_prompt.lower():
                 try:
                     return json.loads(content)
@@ -283,12 +283,12 @@ class AIAgentManager:
             return {"response": content}
             
         except Exception as e:
-            logger.error(f"OpenAI API error for agent {agent.name}: {str(e)}")
+            logger.error(f"Errore API OpenAI per agente {agent.name}: {str(e)}")
             raise
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def _call_claude_agent(self, agent: AIAgent, prompt: str, data_context: str) -> Dict:
-        """Call Claude API with retry logic"""
+        """Chiama API Claude con logica di retry"""
         try:
             message = self.anthropic_client.messages.create(
                 model=agent.model,
@@ -298,19 +298,19 @@ class AIAgentManager:
                 messages=[
                     {
                         "role": "user",
-                        "content": f"Data Context:\n{data_context}\n\nAnalysis Request:\n{prompt}"
+                        "content": f"Contesto Dati:\n{data_context}\n\nRichiesta Analisi:\n{prompt}"
                     }
                 ]
             )
             
             content = message.content[0].text
             
-            # Try to parse as JSON if expected
+            # Prova a parsare come JSON se previsto
             if "json" in agent.system_prompt.lower():
                 try:
                     return json.loads(content)
                 except json.JSONDecodeError:
-                    # Try to extract JSON from the response
+                    # Prova a estrarre JSON dalla risposta
                     import re
                     json_match = re.search(r'\{.*\}', content, re.DOTALL)
                     if json_match:
@@ -323,37 +323,37 @@ class AIAgentManager:
             return {"response": content}
             
         except Exception as e:
-            logger.error(f"Claude API error for agent {agent.name}: {str(e)}")
+            logger.error(f"Errore API Claude per agente {agent.name}: {str(e)}")
             raise
     
     async def _run_agent(self, agent: AIAgent, prompt: str, data_context: str) -> Dict:
-        """Run a single agent with the given prompt and context"""
-        logger.info(f"Running {agent.name} agent...")
+        """Esegue un singolo agente con prompt e contesto dati"""
+        logger.info(f"Esecuzione agente {agent.name}...")
         
         if agent.provider == 'openai' and 'openai' in self.api_keys:
             return await self._call_openai_agent(agent, prompt, data_context)
         elif agent.provider == 'claude' and 'claude' in self.api_keys:
             return await self._call_claude_agent(agent, prompt, data_context)
         else:
-            logger.warning(f"API key not available for {agent.provider}")
-            return {"error": f"API key not configured for {agent.provider}"}
+            logger.warning(f"Chiave API non disponibile per {agent.provider}")
+            return {"error": f"Chiave API non configurata per {agent.provider}"}
     
     def _prepare_data_context(self, 
                              data: pd.DataFrame, 
                              column_mapping: Dict,
                              sample_size: int = 100) -> str:
-        """Prepare data context for AI agents"""
+        """Prepara contesto dati per agenti IA"""
         context_parts = []
         
-        # Dataset overview
-        context_parts.append(f"Dataset Shape: {data.shape[0]} rows × {data.shape[1]} columns")
+        # Panoramica dataset
+        context_parts.append(f"Dimensioni Dataset: {data.shape[0]} righe × {data.shape[1]} colonne")
         
-        # Column information with mapping
-        context_parts.append("\nColumn Information:")
-        for col in data.columns[:20]:  # Limit to first 20 columns for context
+        # Informazioni colonne con mappatura
+        context_parts.append("\nInformazioni Colonne:")
+        for col in data.columns[:20]:  # Limita alle prime 20 colonne per contesto
             dtype = str(data[col].dtype)
             mapping = column_mapping.get(col, {})
-            category = mapping.get('category', 'Unknown')
+            category = mapping.get('category', 'Sconosciuto')
             description = mapping.get('description', '')
             
             nunique = data[col].nunique()
@@ -361,19 +361,19 @@ class AIAgentManager:
             null_pct = (null_count / len(data)) * 100
             
             context_parts.append(
-                f"- {col}: {dtype} | Category: {category} | "
-                f"Unique: {nunique} | Nulls: {null_pct:.1f}% | {description}"
+                f"- {col}: {dtype} | Categoria: {category} | "
+                f"Valori unici: {nunique} | Nulli: {null_pct:.1f}% | {description}"
             )
         
-        # Data sample
-        context_parts.append(f"\nData Sample (first {min(sample_size, len(data))} rows):")
+        # Campione dati
+        context_parts.append(f"\nCampione Dati (prime {min(sample_size, len(data))} righe):")
         sample_df = data.head(sample_size)
         context_parts.append(sample_df.to_string())
         
-        # Basic statistics for numeric columns
+        # Statistiche di base per colonne numeriche
         numeric_cols = data.select_dtypes(include=[np.number]).columns
         if len(numeric_cols) > 0:
-            context_parts.append("\nNumeric Column Statistics:")
+            context_parts.append("\nStatistiche Colonne Numeriche:")
             stats_df = data[numeric_cols].describe()
             context_parts.append(stats_df.to_string())
         
@@ -384,48 +384,48 @@ class AIAgentManager:
                      column_mapping: Dict,
                      analysis_params: Dict,
                      statistical_results: Dict) -> Dict:
-        """Run comprehensive analysis using multiple AI agents"""
+        """Esegue analisi completa usando agenti IA multipli"""
         
-        # Check if we have any agents
+        # Controlla se abbiamo agenti
         if not self.agents:
-            logger.error("No AI agents available")
+            logger.error("Nessun agente IA disponibile")
             return {
-                'error': 'No AI agents configured. Please check API keys.',
+                'error': 'Nessun agente IA configurato. Controlla le chiavi API.',
                 'insights': [],
-                'summary': 'Analysis could not be completed due to missing API configuration.'
+                'summary': 'L\'analisi non può essere completata per mancanza di configurazione API.'
             }
         
-        # Prepare data context
+        # Prepara contesto dati
         data_context = self._prepare_data_context(data, column_mapping)
         
-        # Add statistical results to context
-        stats_context = f"\n\nStatistical Analysis Results:\n{json.dumps(statistical_results, default=str, indent=2)[:5000]}"
+        # Aggiungi risultati statistici al contesto
+        stats_context = f"\n\nRisultati Analisi Statistica:\n{json.dumps(statistical_results, default=str, indent=2)[:5000]}"
         full_context = data_context + stats_context
         
-        # Prepare analysis prompt based on user's context
+        # Prepara prompt analisi basato sul contesto utente
         user_context = analysis_params.get('context', '')
         analysis_types = analysis_params.get('analysis_types', [])
         advanced_analysis = analysis_params.get('advanced_analysis', [])
         
         base_prompt = f"""
-        User's Analysis Context: {user_context}
+        Contesto Analisi Utente: {user_context}
         
-        Requested Analysis Types: {', '.join(analysis_types)}
-        Advanced Analysis Requested: {', '.join(advanced_analysis)}
+        Tipi di Analisi Richiesti: {', '.join(analysis_types)}
+        Analisi Avanzate Richieste: {', '.join(advanced_analysis)}
         
-        Please provide comprehensive analysis based on the data and statistical results provided.
-        Focus on actionable insights, patterns, and recommendations.
+        Fornisci un'analisi completa basata sui dati e risultati statistici forniti.
+        Concentrati su insight azionabili, pattern e raccomandazioni.
         """
         
-        # Collect available agents
+        # Raccogli agenti disponibili
         available_agents = list(self.agents.keys())
-        logger.info(f"Available agents: {available_agents}")
+        logger.info(f"Agenti disponibili: {available_agents}")
         
-        # Run agents with error handling
+        # Esegui agenti con gestione errori
         all_results = []
         errors = []
         
-        # Stage 1: Data exploration and pattern detection
+        # Fase 1: Esplorazione dati e rilevamento pattern
         stage1_tasks = []
         
         if AgentRole.DATA_EXPLORER in self.agents:
@@ -433,7 +433,7 @@ class AIAgentManager:
                 AgentRole.DATA_EXPLORER,
                 self._run_agent_safe(
                     self.agents[AgentRole.DATA_EXPLORER],
-                    base_prompt + "\nFocus on data quality, distributions, and preprocessing needs.",
+                    base_prompt + "\nConcentrati su qualità dei dati, distribuzioni e necessità di preprocessamento.",
                     full_context
                 )
             ))
@@ -443,12 +443,12 @@ class AIAgentManager:
                 AgentRole.PATTERN_DETECTOR,
                 self._run_agent_safe(
                     self.agents[AgentRole.PATTERN_DETECTOR],
-                    base_prompt + "\nIdentify patterns, trends, and anomalies in the data.",
+                    base_prompt + "\nIdentifica pattern, trend e anomalie nei dati.",
                     full_context
                 )
             ))
         
-        # Execute Stage 1 with error handling
+        # Esegui Fase 1 con gestione errori
         if stage1_tasks:
             stage1_results = []
             for role, task in stage1_tasks:
@@ -457,14 +457,14 @@ class AIAgentManager:
                     stage1_results.append(result)
                     all_results.append(result)
                 except Exception as e:
-                    logger.error(f"Error in {role}: {str(e)}")
+                    logger.error(f"Errore in {role}: {str(e)}")
                     errors.append(f"{role}: {str(e)}")
                     stage1_results.append({'error': str(e)})
         
-        # Stage 2: Statistical and predictive analysis
+        # Fase 2: Analisi statistica e predittiva
         enhanced_context = full_context
         if all_results:
-            enhanced_context += f"\n\nInitial Analysis Results:\n{json.dumps(all_results, default=str, indent=2)[:3000]}"
+            enhanced_context += f"\n\nRisultati Analisi Iniziale:\n{json.dumps(all_results, default=str, indent=2)[:3000]}"
         
         stage2_tasks = []
         
@@ -473,7 +473,7 @@ class AIAgentManager:
                 AgentRole.STATISTICAL_ANALYST,
                 self._run_agent_safe(
                     self.agents[AgentRole.STATISTICAL_ANALYST],
-                    base_prompt + "\nProvide detailed statistical analysis and hypothesis testing results.",
+                    base_prompt + "\nFornisci analisi statistica dettagliata e risultati test di ipotesi.",
                     enhanced_context
                 )
             ))
@@ -483,55 +483,55 @@ class AIAgentManager:
                 AgentRole.PREDICTIVE_MODELER,
                 self._run_agent_safe(
                     self.agents[AgentRole.PREDICTIVE_MODELER],
-                    base_prompt + "\nRecommend predictive models and forecast scenarios.",
+                    base_prompt + "\nRaccomanda modelli predittivi e scenari di previsione.",
                     enhanced_context
                 )
             ))
         
-        # Execute Stage 2 with error handling
+        # Esegui Fase 2 con gestione errori
         if stage2_tasks:
             for role, task in stage2_tasks:
                 try:
                     result = await task
                     all_results.append(result)
                 except Exception as e:
-                    logger.error(f"Error in {role}: {str(e)}")
+                    logger.error(f"Errore in {role}: {str(e)}")
                     errors.append(f"{role}: {str(e)}")
         
-        # Stage 3: Insight generation and report writing
+        # Fase 3: Generazione insight e scrittura report
         final_context = full_context
         if all_results:
-            final_context += f"\n\nAll Analysis Results:\n{json.dumps(all_results, default=str, indent=2)[:5000]}"
+            final_context += f"\n\nTutti i Risultati Analisi:\n{json.dumps(all_results, default=str, indent=2)[:5000]}"
         
         insights = None
         if AgentRole.INSIGHT_GENERATOR in self.agents:
             try:
                 insights = await self._run_agent_safe(
                     self.agents[AgentRole.INSIGHT_GENERATOR],
-                    base_prompt + "\nGenerate actionable business insights and recommendations based on all analyses.",
+                    base_prompt + "\nGenera insight di business azionabili e raccomandazioni basate su tutte le analisi.",
                     final_context
                 )
             except Exception as e:
-                logger.error(f"Error in Insight Generator: {str(e)}")
-                errors.append(f"Insight Generator: {str(e)}")
+                logger.error(f"Errore in Generatore Insight: {str(e)}")
+                errors.append(f"Generatore Insight: {str(e)}")
         
         report = None
         if AgentRole.REPORT_WRITER in self.agents:
             try:
                 report_context = final_context
                 if insights:
-                    report_context += f"\n\nGenerated Insights:\n{json.dumps(insights, default=str, indent=2)[:3000]}"
+                    report_context += f"\n\nInsight Generati:\n{json.dumps(insights, default=str, indent=2)[:3000]}"
                 
                 report = await self._run_agent_safe(
                     self.agents[AgentRole.REPORT_WRITER],
-                    "Create a comprehensive analysis report with executive summary, key findings, and recommendations.",
+                    "Crea un report di analisi completo con riepilogo esecutivo, risultati chiave e raccomandazioni.",
                     report_context
                 )
             except Exception as e:
-                logger.error(f"Error in Report Writer: {str(e)}")
-                errors.append(f"Report Writer: {str(e)}")
+                logger.error(f"Errore in Scrittore Report: {str(e)}")
+                errors.append(f"Scrittore Report: {str(e)}")
         
-        # Compile results
+        # Compila risultati
         results = {
             'data_exploration': all_results[0] if len(all_results) > 0 else None,
             'patterns': all_results[1] if len(all_results) > 1 else None,
@@ -546,94 +546,94 @@ class AIAgentManager:
         return results
     
     async def _run_agent_safe(self, agent: AIAgent, prompt: str, data_context: str) -> Dict:
-        """Run agent with error handling"""
+        """Esegue agente con gestione errori"""
         try:
             return await self._run_agent(agent, prompt, data_context)
         except Exception as e:
-            logger.error(f"Agent {agent.name} failed: {str(e)}")
+            logger.error(f"Agente {agent.name} fallito: {str(e)}")
             return {"error": str(e), "agent": agent.name}
     
     def _generate_fallback_insights(self, statistical_results: Dict) -> List[Dict]:
-        """Generate basic insights from statistical results when AI fails"""
+        """Genera insight di base dai risultati statistici quando l'IA fallisce"""
         insights = []
         
         if 'correlations' in statistical_results:
             if 'significant_correlations' in statistical_results['correlations']:
                 for corr in statistical_results['correlations']['significant_correlations'][:3]:
                     insights.append({
-                        'title': f"Strong correlation between {corr['var1']} and {corr['var2']}",
-                        'description': f"Correlation coefficient: {corr['correlation']:.2f}",
+                        'title': f"Forte correlazione tra {corr['var1']} e {corr['var2']}",
+                        'description': f"Coefficiente di correlazione: {corr['correlation']:.2f}",
                         'confidence': abs(corr['correlation']),
-                        'impact': 'high' if abs(corr['correlation']) > 0.7 else 'medium'
+                        'impact': 'alto' if abs(corr['correlation']) > 0.7 else 'medio'
                     })
         
         if 'outliers' in statistical_results:
             insights.append({
-                'title': "Outliers detected in dataset",
-                'description': "Several variables contain outlier values that may require attention",
+                'title': "Outlier rilevati nel dataset",
+                'description': "Diverse variabili contengono valori outlier che potrebbero richiedere attenzione",
                 'confidence': 0.8,
-                'impact': 'medium'
+                'impact': 'medio'
             })
         
         return insights
     
     def _generate_fallback_report(self, all_results: List[Dict], statistical_results: Dict) -> str:
-        """Generate basic report when AI report writer fails"""
-        report = "# Analysis Report\n\n"
-        report += "## Statistical Analysis Summary\n\n"
+        """Genera report di base quando lo scrittore report IA fallisce"""
+        report = "# Report Analisi\n\n"
+        report += "## Riepilogo Analisi Statistica\n\n"
         
         if 'descriptive' in statistical_results:
-            report += "Descriptive statistics have been calculated for all variables.\n\n"
+            report += "Le statistiche descrittive sono state calcolate per tutte le variabili.\n\n"
         
         if 'correlations' in statistical_results:
-            report += "Correlation analysis has been performed to identify relationships.\n\n"
+            report += "L'analisi delle correlazioni è stata eseguita per identificare relazioni.\n\n"
         
         if all_results:
-            report += "## AI Analysis\n\n"
+            report += "## Analisi IA\n\n"
             for result in all_results:
                 if isinstance(result, dict) and 'error' not in result:
-                    report += "- Analysis completed successfully\n"
+                    report += "- Analisi completata con successo\n"
         
         return report
     
     def _extract_insights(self, insights_response: Dict) -> List[Dict]:
-        """Extract and structure insights from AI response"""
+        """Estrae e struttura insight dalla risposta IA"""
         insights = []
         
         if isinstance(insights_response, dict):
             if 'insights' in insights_response:
                 insights = insights_response['insights']
             elif 'recommendations' in insights_response:
-                # Convert recommendations to insights format
+                # Converti raccomandazioni in formato insight
                 for i, rec in enumerate(insights_response['recommendations'], 1):
                     insights.append({
-                        'title': f"Recommendation {i}",
+                        'title': f"Raccomandazione {i}",
                         'description': rec,
                         'confidence': 0.8,
-                        'impact': 'medium'
+                        'impact': 'medio'
                     })
             elif 'response' in insights_response:
-                # Parse text response into insights
+                # Parsa risposta testuale in insight
                 response_text = insights_response['response']
-                # Simple parsing - split by numbers or bullets
+                # Parsing semplice - dividi per numeri o punti elenco
                 import re
-                points = re.split(r'\d+\.|•|■|-\s', response_text)
-                for point in points[:10]:  # Limit to 10 insights
+                points = re.split(r'\d+\.|\•|▪|-\s', response_text)
+                for point in points[:10]:  # Limita a 10 insight
                     if len(point.strip()) > 20:
                         insights.append({
                             'title': point.strip()[:50] + '...' if len(point.strip()) > 50 else point.strip(),
                             'description': point.strip(),
                             'confidence': 0.7,
-                            'impact': 'medium'
+                            'impact': 'medio'
                         })
         
         return insights
     
     def _generate_summary(self, all_results: List[Dict], insights: Optional[Dict]) -> str:
-        """Generate executive summary from all agent results"""
+        """Genera riepilogo esecutivo da tutti i risultati degli agenti"""
         summary_parts = []
         
-        # Extract key points from each agent's analysis
+        # Estrai punti chiave dall'analisi di ogni agente
         for result in all_results:
             if isinstance(result, dict):
                 if 'summary' in result:
@@ -641,7 +641,7 @@ class AIAgentManager:
                 elif 'key_findings' in result:
                     summary_parts.append(str(result['key_findings']))
                 elif 'response' in result:
-                    # Take first paragraph or first 200 characters
+                    # Prendi primo paragrafo o primi 200 caratteri
                     response = result['response']
                     if isinstance(response, str):
                         first_para = response.split('\n')[0]
@@ -649,22 +649,26 @@ class AIAgentManager:
                             first_para = first_para[:200] + '...'
                         summary_parts.append(first_para)
         
-        # Add insights summary
+        # Aggiungi riepilogo insight
         if insights and 'response' in insights:
             summary_parts.append(insights['response'][:300] + '...')
         
-        return '\n\n'.join(summary_parts[:5])  # Limit to 5 summary points
+        return '\n\n'.join(summary_parts[:5])  # Limita a 5 punti di riepilogo
     
     def estimate_token_usage(self, text: str) -> int:
-        """Estimate token usage for OpenAI models"""
-        return len(self.encoding.encode(text))
+        """Stima uso token per modelli OpenAI"""
+        if self.encoding:
+            return len(self.encoding.encode(text))
+        else:
+            # Stima approssimativa: 4 caratteri = 1 token
+            return len(text) // 4
     
     def validate_context_size(self, context: str, max_tokens: int = 8000) -> str:
-        """Ensure context fits within token limits"""
+        """Assicura che il contesto rientri nei limiti di token"""
         tokens = self.estimate_token_usage(context)
         
         if tokens > max_tokens:
-            # Truncate context to fit
+            # Tronca contesto per adattarlo
             lines = context.split('\n')
             truncated_lines = []
             current_tokens = 0
