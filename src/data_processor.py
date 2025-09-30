@@ -99,18 +99,40 @@ class DataProcessor:
             if not pd.api.types.is_datetime64_any_dtype(data[col]):
                 data[col] = pd.to_datetime(data[col], errors='coerce')
             
-            # Extract datetime features
-            if data[col].notna().sum() > 0:
-                data[f'{col}_year'] = data[col].dt.year
-                data[f'{col}_month'] = data[col].dt.month
-                data[f'{col}_day'] = data[col].dt.day
-                data[f'{col}_dayofweek'] = data[col].dt.dayofweek
-                data[f'{col}_quarter'] = data[col].dt.quarter
-                data[f'{col}_is_weekend'] = data[col].dt.dayofweek.isin([5, 6]).astype(int)
+            # Check if we have valid datetime data
+            if data[col].notna().sum() == 0:
+                logger.warning(f"No valid datetime values in column {col}")
+                return data
+            
+            # Extract datetime features only if we have enough variation
+            unique_dates = data[col].nunique()
+            if unique_dates > 1:  # Only extract features if dates vary
+                # Year - only if multiple years
+                unique_years = data[col].dt.year.nunique()
+                if unique_years > 1:
+                    data[f'{col}_year'] = data[col].dt.year
                 
-                # Calculate days since minimum date
-                min_date = data[col].min()
-                data[f'{col}_days_since_start'] = (data[col] - min_date).dt.days
+                # Month - only if multiple months  
+                unique_months = data[col].dt.month.nunique()
+                if unique_months > 1:
+                    data[f'{col}_month'] = data[col].dt.month
+                    data[f'{col}_quarter'] = data[col].dt.quarter
+                
+                # Day features - only if enough variation
+                if unique_dates > 7:
+                    data[f'{col}_day'] = data[col].dt.day
+                    data[f'{col}_dayofweek'] = data[col].dt.dayofweek
+                    data[f'{col}_is_weekend'] = data[col].dt.dayofweek.isin([5, 6]).astype(int)
+                
+                # Days since start - only if meaningful
+                if unique_dates > 1:
+                    min_date = data[col].min()
+                    days_since = (data[col] - min_date).dt.days
+                    if days_since.std() > 0:  # Only add if there's variation
+                        data[f'{col}_days_since_start'] = days_since
+            else:
+                logger.info(f"Column {col} has only one unique date, skipping feature extraction")
+                
         except Exception as e:
             logger.error(f"Error processing datetime column {col}: {str(e)}")
         
