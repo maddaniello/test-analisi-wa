@@ -314,6 +314,53 @@ class AIDataAnalysisApp:
                 "Currency", "Percentage", "Score/Rating", "Boolean", "Other"
             ]
             
+            # Smart category suggestion based on column name
+            def suggest_category(col_name: str, dtype: str, unique_ratio: float) -> str:
+                col_lower = col_name.lower()
+                
+                # Date/Time patterns
+                if any(x in col_lower for x in ['date', 'time', 'timestamp', 'datetime', 'created', 'updated']):
+                    return "Date/Time"
+                
+                # Currency/Money patterns
+                if any(x in col_lower for x in ['cost', 'price', 'revenue', 'amount', 'spend', 'budget', 
+                                                'entrate', 'uscite', 'euro', 'dollar', 'usd', 'eur', 
+                                                'payment', 'fee', 'charge']):
+                    # Revenue/entrate are usually targets
+                    if any(x in col_lower for x in ['revenue', 'entrate', 'profit', 'income', 'sales']):
+                        return "Target Variable"
+                    else:
+                        return "Currency"
+                
+                # Percentage patterns
+                if any(x in col_lower for x in ['percent', 'rate', 'ratio', 'pct', '%']):
+                    return "Percentage"
+                
+                # ID patterns
+                if any(x in col_lower for x in ['id', 'key', 'code', 'identifier']) and unique_ratio > 0.9:
+                    return "Identifier"
+                
+                # Boolean patterns
+                if dtype == 'bool' or unique_ratio == 2:
+                    return "Boolean"
+                
+                # Category patterns
+                if unique_ratio < 0.05 or any(x in col_lower for x in ['category', 'type', 'class', 'group', 'status']):
+                    return "Category/Label"
+                
+                # Numeric patterns
+                if 'float' in dtype or 'int' in dtype:
+                    if any(x in col_lower for x in ['score', 'rating']):
+                        return "Score/Rating"
+                    else:
+                        return "Numeric Measure"
+                
+                # Text patterns
+                if dtype == 'object' and unique_ratio > 0.5:
+                    return "Text/Description"
+                
+                return "Other"
+            
             # Create mapping interface
             col1, col2, col3 = st.columns(3)
             
@@ -324,23 +371,36 @@ class AIDataAnalysisApp:
                     # Display column info
                     dtype = str(st.session_state.data[column].dtype)
                     unique_count = st.session_state.data[column].nunique()
+                    unique_ratio = unique_count / len(st.session_state.data)
                     
                     st.markdown(f"**{column}**")
                     st.caption(f"Type: {dtype} | Unique: {unique_count}")
                     
-                    # Category selection
+                    # Get suggested category
+                    suggested_cat = suggest_category(column, dtype, unique_ratio)
+                    
+                    # Category selection with smart default
                     selected_category = st.selectbox(
                         "Category",
                         categories,
+                        index=categories.index(suggested_cat),
                         key=f"cat_{column}",
                         label_visibility="collapsed"
                     )
                     
-                    # Custom description
+                    # Custom description with helpful placeholder
+                    placeholder_text = {
+                        "Target Variable": "Variabile da prevedere/ottimizzare",
+                        "Currency": "Spesa o costo in valuta",
+                        "Date/Time": "Per analisi temporali e trend",
+                        "Feature": "Variabile predittiva",
+                        "Identifier": "ID univoco, escluso da correlazioni"
+                    }.get(selected_category, "Aggiungi contesto per l'AI")
+                    
                     custom_desc = st.text_input(
                         "Description (optional)",
                         key=f"desc_{column}",
-                        placeholder="Add context for AI"
+                        placeholder=placeholder_text
                     )
                     
                     # Store mapping
