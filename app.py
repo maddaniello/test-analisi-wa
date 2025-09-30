@@ -660,62 +660,186 @@ This dataset contains e-commerce sales data from 2023. I want to:
                     st.warning("Some AI agents encountered errors:")
                     for error in results['ai']['errors']:
                         st.error(f"• {error}")
-                    st.info("Showing available insights from successful agents:")
+                    st.info("Showing available insights from successful agents and statistical analysis:")
                 
+                # Compile all available AI results
+                ai_content_found = False
+                
+                # 1. Check for formatted insights
                 if 'insights' in results['ai'] and results['ai']['insights']:
+                    ai_content_found = True
                     insights = results['ai']['insights']
                     
-                    # Handle different insight formats
+                    st.markdown("### 📊 Key Insights")
                     if isinstance(insights, list):
                         for i, insight in enumerate(insights, 1):
                             if isinstance(insight, dict):
-                                st.markdown(f"### Insight {i}: {insight.get('title', 'Analysis')}")
-                                st.write(insight.get('description', ''))
+                                with st.container():
+                                    col1, col2 = st.columns([4, 1])
+                                    with col1:
+                                        st.markdown(f"**Insight {i}: {insight.get('title', 'Analysis')}**")
+                                        st.write(insight.get('description', ''))
+                                    with col2:
+                                        if 'confidence' in insight:
+                                            conf_value = insight['confidence']
+                                            if isinstance(conf_value, (int, float)):
+                                                if conf_value <= 1:
+                                                    st.metric("Confidence", f"{conf_value:.0%}")
+                                                else:
+                                                    st.metric("Score", f"{conf_value:.1f}")
                                 
                                 if 'recommendations' in insight:
-                                    st.markdown("**Recommendations:**")
-                                    recs = insight['recommendations']
-                                    if isinstance(recs, list):
-                                        for rec in recs:
-                                            st.write(f"• {rec}")
-                                    else:
-                                        st.write(recs)
-                                
-                                if 'confidence' in insight:
-                                    conf_value = insight['confidence']
-                                    if isinstance(conf_value, (int, float)):
-                                        st.metric("Confidence Score", f"{conf_value:.2%}" if conf_value <= 1 else f"{conf_value:.2f}")
-                                
-                                st.markdown("---")
+                                    with st.expander("View Recommendations"):
+                                        recs = insight['recommendations']
+                                        if isinstance(recs, list):
+                                            for rec in recs:
+                                                st.write(f"• {rec}")
+                                        else:
+                                            st.write(recs)
+                                st.divider()
                             else:
                                 st.write(f"• {insight}")
                     else:
                         st.write(insights)
-                else:
-                    st.info("No AI insights were generated. This could be due to API issues or insufficient data.")
                 
+                # 2. Check for patterns (even if no insights)
                 if 'patterns' in results['ai'] and results['ai']['patterns']:
-                    st.markdown("### Discovered Patterns")
+                    ai_content_found = True
+                    st.markdown("### 🔍 Discovered Patterns")
                     patterns = results['ai']['patterns']
-                    if isinstance(patterns, list):
-                        for pattern in patterns:
+                    
+                    if isinstance(patterns, dict):
+                        # If patterns is from the AI response
+                        if 'response' in patterns:
+                            st.write(patterns['response'])
+                        else:
+                            for key, value in patterns.items():
+                                with st.expander(f"Pattern: {key}"):
+                                    st.write(value)
+                    elif isinstance(patterns, list):
+                        for i, pattern in enumerate(patterns, 1):
                             if isinstance(pattern, dict):
-                                with st.expander(pattern.get('name', 'Pattern')):
-                                    st.write(pattern.get('description', ''))
+                                with st.expander(f"Pattern {i}: {pattern.get('name', pattern.get('type', 'Discovery'))}"):
+                                    st.write(pattern.get('description', str(pattern)))
                                     if 'significance' in pattern:
                                         st.metric("Significance", pattern['significance'])
-                    elif isinstance(patterns, dict):
-                        st.json(patterns)
+                                    if 'details' in pattern:
+                                        st.json(pattern['details'])
+                            else:
+                                st.write(f"• Pattern {i}: {pattern}")
                 
-                # Show raw AI responses if available (for debugging)
-                with st.expander("View Raw AI Responses (Debug)"):
-                    if 'data_exploration' in results['ai'] and results['ai']['data_exploration']:
-                        st.markdown("**Data Exploration:**")
-                        st.json(results['ai']['data_exploration'])
+                # 3. Check for data exploration results
+                if 'data_exploration' in results['ai'] and results['ai']['data_exploration']:
+                    exploration = results['ai']['data_exploration']
+                    if exploration and not isinstance(exploration, dict) or (isinstance(exploration, dict) and 'error' not in exploration):
+                        ai_content_found = True
+                        st.markdown("### 📈 Data Exploration Findings")
+                        
+                        if isinstance(exploration, dict):
+                            if 'response' in exploration:
+                                st.write(exploration['response'])
+                            else:
+                                # Try to extract meaningful parts
+                                for key, value in exploration.items():
+                                    if key not in ['error', 'agent']:
+                                        with st.expander(f"Finding: {key.replace('_', ' ').title()}"):
+                                            if isinstance(value, (list, dict)):
+                                                st.json(value)
+                                            else:
+                                                st.write(value)
+                
+                # 4. Check for statistical analysis from AI
+                if 'statistical_analysis' in results['ai'] and results['ai']['statistical_analysis']:
+                    stat_analysis = results['ai']['statistical_analysis']
+                    if stat_analysis and not isinstance(stat_analysis, dict) or (isinstance(stat_analysis, dict) and 'error' not in stat_analysis):
+                        ai_content_found = True
+                        st.markdown("### 📉 Statistical Analysis Insights")
+                        
+                        if isinstance(stat_analysis, dict):
+                            if 'response' in stat_analysis:
+                                st.write(stat_analysis['response'])
+                            else:
+                                for key, value in stat_analysis.items():
+                                    if key not in ['error', 'agent']:
+                                        st.write(f"**{key.replace('_', ' ').title()}:** {value}")
+                
+                # 5. Check for predictive modeling results
+                if 'predictive_modeling' in results['ai'] and results['ai']['predictive_modeling']:
+                    predictive = results['ai']['predictive_modeling']
+                    if predictive and not isinstance(predictive, dict) or (isinstance(predictive, dict) and 'error' not in predictive):
+                        ai_content_found = True
+                        st.markdown("### 🔮 Predictive Modeling Recommendations")
+                        
+                        if isinstance(predictive, dict):
+                            if 'response' in predictive:
+                                st.write(predictive['response'])
+                            else:
+                                st.json(predictive)
+                
+                # 6. Show summary if available
+                if 'summary' in results['ai'] and results['ai']['summary']:
+                    ai_content_found = True
+                    st.markdown("### 📝 Analysis Summary")
+                    st.info(results['ai']['summary'])
+                
+                # 7. Show report if available
+                if 'report' in results['ai'] and results['ai']['report']:
+                    ai_content_found = True
+                    with st.expander("📄 View Full Report"):
+                        st.markdown(results['ai']['report'])
+                
+                # If no AI content was found, show statistical insights
+                if not ai_content_found:
+                    st.info("AI analysis is processing. Here are statistical insights from your data:")
                     
-                    if 'statistical_analysis' in results['ai'] and results['ai']['statistical_analysis']:
-                        st.markdown("**Statistical Analysis:**")
-                        st.json(results['ai']['statistical_analysis'])
+                    # Show statistical insights
+                    if 'statistical' in results:
+                        if 'significant_correlations' in results['statistical'].get('correlations', {}):
+                            st.markdown("### 🔗 Significant Correlations Found")
+                            corrs = results['statistical']['correlations']['significant_correlations']
+                            for corr in corrs[:5]:
+                                st.write(f"• **{corr['var1']}** ↔ **{corr['var2']}**: "
+                                        f"{corr['direction']} {corr['strength'].lower()} correlation "
+                                        f"(r={corr['correlation']:.3f})")
+                        
+                        if 'outliers' in results['statistical']:
+                            st.markdown("### ⚠️ Outliers Detected")
+                            outliers = results['statistical']['outliers']
+                            if 'iqr_method' in outliers:
+                                for col, info in outliers['iqr_method'].items():
+                                    if info['count'] > 0:
+                                        st.write(f"• **{col}**: {info['count']} outliers ({info['percentage']:.1f}%)")
+                
+                # Debug section
+                with st.expander("🔧 View Raw AI Responses (Debug)", expanded=False):
+                    debug_tabs = st.tabs(["All Results", "Data Exploration", "Patterns", "Statistical", "Predictive"])
+                    
+                    with debug_tabs[0]:
+                        st.json(results['ai'])
+                    
+                    with debug_tabs[1]:
+                        if 'data_exploration' in results['ai']:
+                            st.json(results['ai']['data_exploration'])
+                        else:
+                            st.write("No data exploration results")
+                    
+                    with debug_tabs[2]:
+                        if 'patterns' in results['ai']:
+                            st.json(results['ai']['patterns'])
+                        else:
+                            st.write("No pattern results")
+                    
+                    with debug_tabs[3]:
+                        if 'statistical_analysis' in results['ai']:
+                            st.json(results['ai']['statistical_analysis'])
+                        else:
+                            st.write("No statistical analysis results")
+                    
+                    with debug_tabs[4]:
+                        if 'predictive_modeling' in results['ai']:
+                            st.json(results['ai']['predictive_modeling'])
+                        else:
+                            st.write("No predictive modeling results")
             
             # Visualizations Tab
             with tabs[2]:
