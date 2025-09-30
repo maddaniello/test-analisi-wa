@@ -409,8 +409,8 @@ class StatisticalAnalyzer:
             else:
                 # Try to parse as datetime
                 try:
-                    pd.to_datetime(data[col], errors='coerce')
-                    if data[col].notna().sum() > len(data) * 0.5:  # At least 50% valid dates
+                    test_parse = pd.to_datetime(data[col].iloc[:10], errors='coerce')
+                    if test_parse.notna().sum() > 5:  # At least 50% valid dates in sample
                         date_cols.append(col)
                 except:
                     pass
@@ -420,58 +420,176 @@ class StatisticalAnalyzer:
         
         # Use first date column
         date_col = date_cols[0]
-        data['_datetime'] = pd.to_datetime(data[date_col], errors='coerce')
-        data_ts = data.dropna(subset=['_datetime']).set_index('_datetime').sort_index()
+        try:
+            data['_datetime'] = pd.to_datetime(data[date_col], errors='coerce')
+        except:
+            return {'message': 'Could not parse datetime column'}
+        
+        data_ts = data.dropna(subset=['_datetime']).copy()
+        
+        if len(data_ts) < 2:
+            return {'message': 'Not enough valid dates for time series analysis'}
+        
+        # Sort by date and set as index
+        data_ts = data_ts.set_index('_datetime').sort_index()
         
         # Analyze numeric columns over time
         numeric_cols = data_ts.select_dtypes(include=[np.number]).columns.tolist()
         
-        for col in numeric_cols[:5]:  # Limit to first 5 numeric columns
+        # Filter out constant columns and derived date columns
+        valid_cols = []
+        for col in numeric_cols:
+            # Skip date-derived columns
+            if any(x in col.lower() for x in ['_year', '_month', '_day', '_quarter', '_dayofweek', 
+                                               '_weekend', '_days_since', '_encoded']):
+                continue
+            
+            # Check if column has variation
+            if data_ts[col].nunique() > 1 and data_ts[col].std() > 0:
+                valid_cols.append(col)
+        
+        if not valid_cols:
+            return {'message': 'No suitable numeric columns with variation for time series analysis'}
+        
+        for col in valid_cols[:5]:  # Limit to first 5 valid columns
             col_results = {}
             
-            # Resample to appropriate frequency
-            if len(data_ts) > 365:
-                ts_data = data_ts[col].resample('D').mean()
-            elif len(data_ts) > 52:
-                ts_data = data_ts[col].resample('W').mean()
-            else:
-                ts_data = data_ts[col]
-            
-            ts_data = ts_data.dropna()
-            
-            if len(ts_data) > 10:
+            try:
+                # Resample to appropriate frequency
+                if len(data_ts) > 365:
+                    ts_data = data_ts[col].resample('D').mean()
+                elif len(data_ts) > 52:
+                    ts_data = data_ts[col].resample('W').mean()
+                else:
+                    ts_data = data_ts[col]
+                
+                # Remove NaN values
+                ts_data = ts_data.dropna()
+                
+                if len(ts_data) < 10:
+                    col_results['message'] = 'Insufficient data points for analysis'
+                    continue
+                
+                # Check for constant values after resampling
+                if ts_data.std() == 0 or ts_data.nunique() == 1:
+                    col_results['message'] = 'Data is constant after resampling'
+                    continue
+                
                 # Stationarity test
-                adf_result = adfuller(ts_data)
-                col_results['stationarity'] = {
-                    'adf_statistic': adf_result[0],
-                    'p_value': adf_result[1],
-                    'is_stationary': adf_result[1] < 0.05
-                }
+                try:
+                    adf_result = adfuller(ts_data, autolag='AIC')
+                    col_results['stationarity'] = {
+                        'adf_statistic': float(adf_result[0]),
+                        'p_value': float(adf_result[1]),
+                        'is_stationary': adf_result[1] < 0.05,
+                        'critical_values': {str(k): float(v) for k, v in adf_result[4].items()}
+                    }
+                except Exception as e:
+                    logger.warning(f"Could not perform ADF test for {col}: {str(e)}")
                 
                 # Seasonal decomposition (if enough data)
-                if len(ts_data) > 2 * 12:  # At least 2 years of monthly data
+                if len(ts_data) >= 24:  # At least 2 years/cycles
                     try:
-                        decomposition = seasonal_decompose(ts_data, model='additive', period=12)
+                        # Determine period based on data frequency
+                        if len(data_ts) > 365:
+                            period = 7  # Weekly pattern in daily data
+                        elif len(data_ts) > 52:
+                            period = 4  # Monthly pattern in weekly data
+                        else:
+                            period = min(12, len(ts_data) // 2)
+                        
+                        decomposition = seasonal_decompose(ts_data, model='additive', period=period)
+                        
+                        # Calculate seasonality strength
+                        seasonal_strength = decomposition.seasonal.std()
+                        trend_strength = decomposition.trend.dropna().std()
+                        residual_strength = decomposition.resid.dropna().std()
+                        
                         col_results['seasonality'] = {
-                            'seasonal_strength': decomposition.seasonal.std(),
-                            'trend_strength': decomposition.trend.dropna().std(),
-                            'has_seasonality': decomposition.seasonal.std() > decomposition.resid.dropna().std()
+                            'seasonal_strength': float(seasonal_strength),
+                            'trend_strength': float(trend_strength),
+                            'residual_strength': float(residual_strength),
+                            'has_seasonality': seasonal_strength > residual_strength * 0.5,
+                            'has_trend': trend_strength > residual_strength * 0.5,
+                            'period': period
                         }
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"Could not perform seasonal decomposition for {col}: {str(e)}")
                 
                 # Autocorrelation
                 try:
-                    acf_values = acf(ts_data, nlags=min(40, len(ts_data)//4))
-                    col_results['autocorrelation'] = {
-                        'lag_1': acf_values[1] if len(acf_values) > 1 else None,
-                        'significant_lags': [i for i, val in enumerate(acf_values[1:], 1) 
-                                           if abs(val) > 2/np.sqrt(len(ts_data))][:10]
-                    }
-                except:
-                    pass
+                    if len(ts_data) > 10:
+                        max_lags = min(40, len(ts_data) // 4)
+                        acf_values = acf(ts_data, nlags=max_lags, fft=True)
+                        
+                        # Find significant lags
+                        confidence_interval = 2 / np.sqrt(len(ts_data))
+                        significant_lags = []
+                        for i in range(1, len(acf_values)):
+                            if abs(acf_values[i]) > confidence_interval:
+                                significant_lags.append(i)
+                        
+                        col_results['autocorrelation'] = {
+                            'lag_1': float(acf_values[1]) if len(acf_values) > 1 else None,
+                            'max_correlation': float(np.max(np.abs(acf_values[1:]))) if len(acf_values) > 1 else None,
+                            'significant_lags': significant_lags[:10],  # Limit to first 10
+                            'has_autocorrelation': len(significant_lags) > 0
+                        }
+                except Exception as e:
+                    logger.warning(f"Could not calculate autocorrelation for {col}: {str(e)}")
+                
+                # Basic trend analysis
+                try:
+                    # Simple linear trend
+                    x = np.arange(len(ts_data))
+                    y = ts_data.values
+                    
+                    # Calculate linear regression
+                    x_mean = x.mean()
+                    y_mean = y.mean()
+                    
+                    numerator = ((x - x_mean) * (y - y_mean)).sum()
+                    denominator = ((x - x_mean) ** 2).sum()
+                    
+                    if denominator != 0:
+                        slope = numerator / denominator
+                        intercept = y_mean - slope * x_mean
+                        
+                        # Calculate R-squared
+                        y_pred = slope * x + intercept
+                        ss_res = ((y - y_pred) ** 2).sum()
+                        ss_tot = ((y - y_mean) ** 2).sum()
+                        r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
+                        
+                        col_results['trend'] = {
+                            'slope': float(slope),
+                            'direction': 'increasing' if slope > 0 else 'decreasing' if slope < 0 else 'flat',
+                            'r_squared': float(r_squared),
+                            'trend_strength': 'strong' if abs(r_squared) > 0.7 else 'moderate' if abs(r_squared) > 0.3 else 'weak'
+                        }
+                except Exception as e:
+                    logger.warning(f"Could not calculate trend for {col}: {str(e)}")
+                
+            except Exception as e:
+                logger.error(f"Error analyzing time series for {col}: {str(e)}")
+                col_results['error'] = str(e)
             
-            results[col] = col_results
+            if col_results:  # Only add if we have some results
+                results[col] = col_results
+        
+        # Add summary
+        if results:
+            results['summary'] = {
+                'columns_analyzed': list(results.keys()),
+                'date_column': date_col,
+                'time_range': {
+                    'start': str(data_ts.index.min()),
+                    'end': str(data_ts.index.max()),
+                    'duration_days': (data_ts.index.max() - data_ts.index.min()).days
+                }
+            }
+        else:
+            results['message'] = 'Could not perform time series analysis on any columns'
         
         return results
     
