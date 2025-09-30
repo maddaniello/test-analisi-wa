@@ -1,5 +1,5 @@
 """
-Visualization Engine Module
+Visualization Engine Module - FIXED VERSION
 Creates interactive visualizations using Plotly
 """
 
@@ -26,30 +26,45 @@ class VisualizationEngine:
         """Create comprehensive visualizations"""
         visualizations = {'charts': []}
         
-        # 1. Distribution plots
-        dist_charts = self._create_distribution_plots(data)
-        visualizations['charts'].extend(dist_charts)
+        try:
+            # 1. Distribution plots
+            dist_charts = self._create_distribution_plots(data)
+            visualizations['charts'].extend(dist_charts)
+        except Exception as e:
+            logger.error(f"Error creating distribution plots: {str(e)}")
         
-        # 2. Correlation heatmap
-        if 'correlations' in statistical_results:
-            corr_chart = self._create_correlation_heatmap(statistical_results['correlations'])
-            if corr_chart:
-                visualizations['charts'].append(corr_chart)
+        try:
+            # 2. Correlation heatmap
+            if 'correlations' in statistical_results:
+                corr_chart = self._create_correlation_heatmap(statistical_results['correlations'])
+                if corr_chart:
+                    visualizations['charts'].append(corr_chart)
+        except Exception as e:
+            logger.error(f"Error creating correlation heatmap: {str(e)}")
         
-        # 3. PCA visualization
-        if 'pca_results' in statistical_results:
-            pca_charts = self._create_pca_visualizations(statistical_results['pca_results'])
-            visualizations['charts'].extend(pca_charts)
+        try:
+            # 3. PCA visualization
+            if 'pca_results' in statistical_results:
+                pca_charts = self._create_pca_visualizations(statistical_results['pca_results'])
+                visualizations['charts'].extend(pca_charts)
+        except Exception as e:
+            logger.error(f"Error creating PCA visualizations: {str(e)}")
         
-        # 4. Time series plots
-        if 'time_series' in statistical_results:
-            ts_charts = self._create_time_series_plots(data, statistical_results['time_series'])
-            visualizations['charts'].extend(ts_charts)
+        try:
+            # 4. Time series plots
+            if 'time_series' in statistical_results:
+                ts_charts = self._create_time_series_plots(data, statistical_results['time_series'])
+                visualizations['charts'].extend(ts_charts)
+        except Exception as e:
+            logger.error(f"Error creating time series plots: {str(e)}")
         
-        # 5. Clustering visualization
-        if 'clustering' in statistical_results:
-            cluster_charts = self._create_clustering_plots(statistical_results['clustering'])
-            visualizations['charts'].extend(cluster_charts)
+        try:
+            # 5. Clustering visualization
+            if 'clustering' in statistical_results:
+                cluster_charts = self._create_clustering_plots(statistical_results['clustering'])
+                visualizations['charts'].extend(cluster_charts)
+        except Exception as e:
+            logger.error(f"Error creating clustering plots: {str(e)}")
         
         return visualizations
     
@@ -121,65 +136,48 @@ class VisualizationEngine:
         """Create PCA visualizations"""
         charts = []
         
-        # Scree plot
-        if 'explained_variance' in pca_results:
-            explained_var = pca_results['explained_variance']
-            cumulative_var = pca_results['cumulative_variance']
-            
+        if 'components' in pca_results and 'explained_variance_ratio' in pca_results:
+            # Scree plot
             fig = go.Figure()
             
-            # Bar chart for explained variance
+            variance_ratios = pca_results['explained_variance_ratio']
+            cumulative_variance = np.cumsum(variance_ratios)
+            
             fig.add_trace(go.Bar(
-                x=list(range(1, len(explained_var) + 1)),
-                y=explained_var,
-                name='Explained Variance',
+                x=list(range(1, len(variance_ratios) + 1)),
+                y=variance_ratios,
+                name='Individual',
                 marker_color='lightblue'
             ))
             
-            # Line chart for cumulative variance
             fig.add_trace(go.Scatter(
-                x=list(range(1, len(cumulative_var) + 1)),
-                y=cumulative_var,
-                name='Cumulative Variance',
+                x=list(range(1, len(variance_ratios) + 1)),
+                y=cumulative_variance,
                 mode='lines+markers',
-                yaxis='y2',
+                name='Cumulative',
                 marker_color='red'
             ))
             
             fig.update_layout(
-                title='PCA Scree Plot',
+                title='PCA: Explained Variance',
                 xaxis_title='Principal Component',
                 yaxis_title='Explained Variance Ratio',
-                yaxis2=dict(
-                    title='Cumulative Variance',
-                    overlaying='y',
-                    side='right'
-                ),
                 template=self.template,
-                height=500
+                height=400
             )
             
             charts.append(fig)
-        
-        # Biplot for first two components
-        if 'scores' in pca_results and 'loadings' in pca_results:
-            scores = pd.DataFrame(pca_results['scores'])
-            if 'PC1' in scores.columns and 'PC2' in scores.columns:
-                fig = go.Figure()
+            
+            # Component loadings plot (if transformed data available)
+            if 'transformed_data' in pca_results:
+                transformed = pca_results['transformed_data']
                 
-                # Add scores
-                fig.add_trace(go.Scatter(
-                    x=scores['PC1'],
-                    y=scores['PC2'],
-                    mode='markers',
-                    name='Observations',
-                    marker=dict(size=8, color='blue', opacity=0.5)
-                ))
-                
-                fig.update_layout(
-                    title='PCA Biplot',
-                    xaxis_title='First Principal Component',
-                    yaxis_title='Second Principal Component',
+                fig = px.scatter(
+                    x=transformed[:, 0] if transformed.shape[1] > 0 else [],
+                    y=transformed[:, 1] if transformed.shape[1] > 1 else [],
+                    title='PCA: First Two Components',
+                    labels={'x': 'First Principal Component', 
+                           'y': 'Second Principal Component'},
                     template=self.template,
                     height=500
                 )
@@ -189,30 +187,51 @@ class VisualizationEngine:
         return charts
     
     def _create_time_series_plots(self, data: pd.DataFrame, ts_results: Dict) -> List:
-        """Create time series visualizations"""
+        """Create time series visualizations - FIXED VERSION"""
         charts = []
         
         # Time series plots for each analyzed column
         for col, results in list(ts_results.items())[:3]:  # Limit to 3 plots
             if col in data.columns:
-                fig = go.Figure()
-                
-                fig.add_trace(go.Scatter(
-                    x=data.index if isinstance(data.index, pd.DatetimeIndex) else range(len(data)),
-                    y=data[col],
-                    mode='lines',
-                    name=col
-                ))
-                
-                fig.update_layout(
-                    title=f'Time Series: {col}',
-                    xaxis_title='Time',
-                    yaxis_title=col,
-                    template=self.template,
-                    height=400
-                )
-                
-                charts.append(fig)
+                try:
+                    fig = go.Figure()
+                    
+                    # FIX: Convert range to list for Plotly compatibility
+                    if isinstance(data.index, pd.DatetimeIndex):
+                        x_values = data.index
+                    else:
+                        # Convert range to list
+                        x_values = list(range(len(data)))
+                    
+                    fig.add_trace(go.Scatter(
+                        x=x_values,
+                        y=data[col],
+                        mode='lines',
+                        name=col
+                    ))
+                    
+                    # Add trend line if available
+                    if 'trend' in results and results['trend'] is not None:
+                        fig.add_trace(go.Scatter(
+                            x=x_values,
+                            y=results['trend'],
+                            mode='lines',
+                            name=f'{col} - Trend',
+                            line=dict(dash='dash')
+                        ))
+                    
+                    fig.update_layout(
+                        title=f'Time Series: {col}',
+                        xaxis_title='Time' if isinstance(data.index, pd.DatetimeIndex) else 'Index',
+                        yaxis_title=col,
+                        template=self.template,
+                        height=400
+                    )
+                    
+                    charts.append(fig)
+                except Exception as e:
+                    logger.error(f"Error creating time series plot for {col}: {str(e)}")
+                    continue
         
         return charts
     
@@ -256,14 +275,90 @@ class VisualizationEngine:
                 fig.update_xaxes(title_text="Number of Clusters", row=1, col=1)
                 fig.update_xaxes(title_text="Number of Clusters", row=1, col=2)
                 fig.update_yaxes(title_text="Inertia", row=1, col=1)
-                fig.update_yaxes(title_text="Silhouette Score", row=1, col=2)
+                fig.update_yaxes(title_text="Score", row=1, col=2)
                 
                 fig.update_layout(
-                    title_text="Clustering Analysis",
-                    template=self.template,
-                    height=400
+                    title_text="K-Means Clustering Analysis",
+                    showlegend=False,
+                    height=400,
+                    template=self.template
                 )
                 
                 charts.append(fig)
         
         return charts
+    
+    def create_custom_chart(self, chart_type: str, data: pd.DataFrame, 
+                           x_col: str = None, y_col: str = None, 
+                           color_col: str = None, **kwargs) -> go.Figure:
+        """Create custom charts based on user preferences"""
+        try:
+            if chart_type == 'scatter':
+                fig = px.scatter(data, x=x_col, y=y_col, color=color_col, 
+                               template=self.template, **kwargs)
+            elif chart_type == 'line':
+                fig = px.line(data, x=x_col, y=y_col, color=color_col,
+                            template=self.template, **kwargs)
+            elif chart_type == 'bar':
+                fig = px.bar(data, x=x_col, y=y_col, color=color_col,
+                           template=self.template, **kwargs)
+            elif chart_type == 'box':
+                fig = px.box(data, x=x_col, y=y_col, color=color_col,
+                           template=self.template, **kwargs)
+            elif chart_type == 'violin':
+                fig = px.violin(data, x=x_col, y=y_col, color=color_col,
+                              template=self.template, **kwargs)
+            else:
+                raise ValueError(f"Unsupported chart type: {chart_type}")
+            
+            return fig
+        except Exception as e:
+            logger.error(f"Error creating custom chart: {str(e)}")
+            return None
+    
+    def create_ai_insights_visualization(self, ai_results: Dict) -> List:
+        """Create visualizations for AI insights"""
+        charts = []
+        
+        # Create charts for different AI agents' results
+        for agent_name, results in ai_results.items():
+            if isinstance(results, dict) and 'visualizations' in results:
+                for viz in results['visualizations']:
+                    try:
+                        if 'type' in viz and 'data' in viz:
+                            chart = self._create_chart_from_spec(viz)
+                            if chart:
+                                charts.append(chart)
+                    except Exception as e:
+                        logger.error(f"Error creating AI visualization: {str(e)}")
+        
+        return charts
+    
+    def _create_chart_from_spec(self, spec: Dict) -> go.Figure:
+        """Create chart from AI-generated specification"""
+        chart_type = spec.get('type')
+        data = spec.get('data')
+        title = spec.get('title', 'AI Generated Chart')
+        
+        if chart_type == 'bar':
+            fig = go.Figure(data=[
+                go.Bar(x=data.get('x', []), y=data.get('y', []))
+            ])
+        elif chart_type == 'line':
+            fig = go.Figure(data=[
+                go.Scatter(x=data.get('x', []), y=data.get('y', []), mode='lines')
+            ])
+        elif chart_type == 'pie':
+            fig = go.Figure(data=[
+                go.Pie(labels=data.get('labels', []), values=data.get('values', []))
+            ])
+        else:
+            return None
+        
+        fig.update_layout(
+            title=title,
+            template=self.template,
+            height=400
+        )
+        
+        return fig
