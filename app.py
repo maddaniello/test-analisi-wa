@@ -1162,7 +1162,7 @@ Questo dataset contiene dati di vendite e-commerce del 2023. Voglio:
         # Richiederebbe librerie aggiuntive come reportlab
         # Per ora, ritorna un placeholder
         output = BytesIO()
-        output.write(b"Funzionalità esportazione PDF da implementare")
+        output.write("Esportazione PDF da implementare")
         output.seek(0)
         return output
     
