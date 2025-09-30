@@ -1214,10 +1214,6 @@ Questo dataset contiene dati di vendite e-commerce del 2023. Voglio:
                     st.write(f"• {dtype}: {count}")
             
             st.markdown("---")
-            st.markdown("### 🔗 Risorse")
-            st.markdown("[Documentazione](https://github.com/yourusername/ai-data-analysis)")
-            st.markdown("[Segnala Problemi](https://github.com/yourusername/ai-data-analysis/issues)")
-            
             st.markdown("---")
             st.markdown("### ⚙️ Impostazioni")
             
