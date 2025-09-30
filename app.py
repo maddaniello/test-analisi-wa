@@ -576,53 +576,102 @@ This dataset contains e-commerce sales data from 2023. I want to:
                         st.json(desc_stats)
                 
                 if 'correlations' in results['statistical']:
-                    st.markdown("### Correlation Matrix")
+                    st.markdown("### Correlation Analysis")
                     corr_data = results['statistical']['correlations']
+                    
+                    # Show excluded columns if any
+                    if isinstance(corr_data, dict) and 'columns_excluded' in corr_data and corr_data['columns_excluded']:
+                        with st.expander("ℹ️ Excluded from correlation analysis"):
+                            st.write("The following columns were excluded as they're not meaningful for correlation:")
+                            excluded_cols = corr_data['columns_excluded']
+                            for col in excluded_cols[:20]:  # Show first 20
+                                st.write(f"• {col}")
+                            if len(excluded_cols) > 20:
+                                st.write(f"... and {len(excluded_cols) - 20} more")
                     
                     # Handle different correlation data formats
                     if isinstance(corr_data, dict):
-                        # If it's a dict with different correlation types
+                        # Show significant correlations first
+                        if 'significant_correlations' in corr_data and corr_data['significant_correlations']:
+                            st.markdown("#### 🎯 Most Important Correlations")
+                            sig_corrs = corr_data['significant_correlations']
+                            
+                            # Create a nice display for significant correlations
+                            for i, corr in enumerate(sig_corrs[:10], 1):  # Show top 10
+                                with st.container():
+                                    col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+                                    with col1:
+                                        st.write(f"**{i}.** {corr['var1']} ↔ {corr['var2']}")
+                                    with col2:
+                                        # Use color coding for correlation strength
+                                        if abs(corr['correlation']) > 0.8:
+                                            st.write(f"🔴 {corr['strength']}")
+                                        elif abs(corr['correlation']) > 0.6:
+                                            st.write(f"🟡 {corr['strength']}")
+                                        else:
+                                            st.write(f"🟢 {corr['strength']}")
+                                    with col3:
+                                        st.write(f"{corr['direction']} (r={corr['correlation']:.3f})")
+                                    with col4:
+                                        if corr['p_value'] < 0.001:
+                                            st.write("***")
+                                        elif corr['p_value'] < 0.01:
+                                            st.write("**")
+                                        elif corr['p_value'] < 0.05:
+                                            st.write("*")
+                            
+                            st.caption("Significance: *** p<0.001, ** p<0.01, * p<0.05")
+                        
+                        # Show target correlations if available
+                        if 'target_correlations' in corr_data and corr_data['target_correlations']:
+                            st.markdown("#### 🎯 Target Variable Correlations")
+                            for target, correlations in corr_data['target_correlations'].items():
+                                with st.expander(f"Correlations with {target}"):
+                                    for corr_item in correlations[:10]:
+                                        col1, col2 = st.columns([3, 1])
+                                        with col1:
+                                            st.write(f"• {corr_item['feature']}")
+                                        with col2:
+                                            corr_val = corr_item['correlation']
+                                            if corr_val > 0:
+                                                st.write(f"↗️ {corr_val:.3f}")
+                                            else:
+                                                st.write(f"↘️ {corr_val:.3f}")
+                        
+                        # Show correlation matrix heatmap if available
                         if 'pearson' in corr_data:
                             corr_matrix = corr_data['pearson']
                         elif 'spearman' in corr_data:
                             corr_matrix = corr_data['spearman']
                         else:
                             corr_matrix = None
-                            st.warning("Correlation data format not recognized")
                     else:
                         corr_matrix = corr_data
                     
-                    # Display correlation matrix if available
+                    # Display correlation heatmap if we have a matrix
                     if corr_matrix is not None and isinstance(corr_matrix, pd.DataFrame) and not corr_matrix.empty:
-                        try:
-                            fig = px.imshow(
-                                corr_matrix.values,
-                                labels=dict(x="Variables", y="Variables", color="Correlation"),
-                                x=corr_matrix.columns.tolist(),
-                                y=corr_matrix.index.tolist(),
-                                color_continuous_scale="RdBu",
-                                zmin=-1,
-                                zmax=1,
-                                aspect="auto"
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                        except Exception as e:
-                            st.error(f"Could not display correlation heatmap: {str(e)}")
-                            st.dataframe(corr_matrix, use_container_width=True)
-                    
-                    # Show significant correlations if available
-                    if isinstance(corr_data, dict) and 'significant_correlations' in corr_data:
-                        st.markdown("#### Significant Correlations")
-                        sig_corrs = corr_data['significant_correlations']
-                        if sig_corrs:
-                            for corr in sig_corrs[:10]:  # Show top 10
-                                col1, col2, col3 = st.columns([2, 1, 1])
-                                with col1:
-                                    st.write(f"{corr['var1']} ↔ {corr['var2']}")
-                                with col2:
-                                    st.write(f"r = {corr['correlation']:.3f}")
-                                with col3:
-                                    st.write(f"{corr['strength']}")
+                        with st.expander("View Full Correlation Matrix"):
+                            try:
+                                # Only show heatmap if not too large
+                                if len(corr_matrix.columns) <= 30:
+                                    fig = px.imshow(
+                                        corr_matrix.values,
+                                        labels=dict(x="Variables", y="Variables", color="Correlation"),
+                                        x=corr_matrix.columns.tolist(),
+                                        y=corr_matrix.index.tolist(),
+                                        color_continuous_scale="RdBu",
+                                        zmin=-1,
+                                        zmax=1,
+                                        aspect="auto"
+                                    )
+                                    fig.update_layout(height=600)
+                                    st.plotly_chart(fig, use_container_width=True)
+                                else:
+                                    st.info(f"Matrix too large ({len(corr_matrix.columns)} variables) for visualization. Showing data table instead.")
+                                    st.dataframe(corr_matrix.round(3), use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Could not display correlation heatmap: {str(e)}")
+                                st.dataframe(corr_matrix.round(3), use_container_width=True)
                 
                 if 'pca_results' in results['statistical']:
                     st.markdown("### PCA Results")
