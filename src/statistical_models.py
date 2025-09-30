@@ -177,50 +177,127 @@ class StatisticalAnalyzer:
         """Perform comprehensive correlation analysis"""
         results = {}
         
+        # Filter out datetime-derived columns and ID columns
+        columns_to_exclude = []
+        for col in data.columns:
+            col_lower = col.lower()
+            # Exclude datetime components
+            if any(x in col_lower for x in ['_year', '_month', '_day', '_dayofweek', '_quarter', 
+                                             '_is_weekend', '_days_since', 'date', 'time', 
+                                             'timestamp', 'datetime']):
+                columns_to_exclude.append(col)
+            # Exclude ID-like columns
+            elif any(x in col_lower for x in ['id', 'index', 'key', 'code', '_encoded']):
+                columns_to_exclude.append(col)
+            # Exclude columns with too many unique values (likely IDs)
+            elif data[col].dtype in ['object', 'string']:
+                continue
+            elif data[col].nunique() > len(data) * 0.95:  # More than 95% unique values
+                columns_to_exclude.append(col)
+        
+        # Select only meaningful numeric columns
+        meaningful_cols = [col for col in data.select_dtypes(include=[np.number]).columns 
+                          if col not in columns_to_exclude]
+        
+        if len(meaningful_cols) < 2:
+            return {'message': 'Not enough meaningful numeric columns for correlation analysis'}
+        
+        # Use only meaningful columns for correlation
+        data_filtered = data[meaningful_cols]
+        
         # Pearson correlation
-        results['pearson'] = data.corr(method='pearson')
+        results['pearson'] = data_filtered.corr(method='pearson')
         
         # Spearman correlation
-        results['spearman'] = data.corr(method='spearman')
+        results['spearman'] = data_filtered.corr(method='spearman')
         
         # Kendall correlation for smaller datasets
-        if len(data) < 1000:
-            results['kendall'] = data.corr(method='kendall')
+        if len(data_filtered) < 1000:
+            results['kendall'] = data_filtered.corr(method='kendall')
         
-        # Find significant correlations
+        # Find significant correlations (excluding self-correlations and redundant pairs)
         corr_matrix = results['pearson']
         significant_corrs = []
+        seen_pairs = set()
         
         for i in range(len(corr_matrix.columns)):
             for j in range(i+1, len(corr_matrix.columns)):
                 col1 = corr_matrix.columns[i]
                 col2 = corr_matrix.columns[j]
+                
+                # Skip if this pair was already seen
+                pair = tuple(sorted([col1, col2]))
+                if pair in seen_pairs:
+                    continue
+                seen_pairs.add(pair)
+                
                 corr_value = corr_matrix.iloc[i, j]
                 
-                if abs(corr_value) > 0.5:  # Strong correlation threshold
-                    # Calculate p-value
-                    _, p_value = pearsonr(data[col1].dropna(), data[col2].dropna())
-                    
-                    significant_corrs.append({
-                        'var1': col1,
-                        'var2': col2,
-                        'correlation': corr_value,
-                        'p_value': p_value,
-                        'strength': 'Strong' if abs(corr_value) > 0.7 else 'Moderate'
-                    })
+                # Only include meaningful correlations (not perfect correlations which might be duplicates)
+                if 0.3 < abs(corr_value) < 0.99:  # Moderate to strong, but not perfect
+                    try:
+                        # Calculate p-value
+                        clean_data1 = data_filtered[col1].dropna()
+                        clean_data2 = data_filtered[col2].dropna()
+                        common_idx = clean_data1.index.intersection(clean_data2.index)
+                        
+                        if len(common_idx) > 3:
+                            _, p_value = pearsonr(
+                                data_filtered.loc[common_idx, col1],
+                                data_filtered.loc[common_idx, col2]
+                            )
+                            
+                            if p_value < 0.05:  # Only statistically significant
+                                significant_corrs.append({
+                                    'var1': col1,
+                                    'var2': col2,
+                                    'correlation': corr_value,
+                                    'p_value': p_value,
+                                    'strength': 'Very Strong' if abs(corr_value) > 0.8 else 
+                                               'Strong' if abs(corr_value) > 0.6 else 'Moderate',
+                                    'direction': 'Positive' if corr_value > 0 else 'Negative'
+                                })
+                    except:
+                        pass
         
-        results['significant_correlations'] = significant_corrs
+        # Sort by absolute correlation value
+        significant_corrs.sort(key=lambda x: abs(x['correlation']), reverse=True)
+        results['significant_correlations'] = significant_corrs[:20]  # Top 20 most significant
         
-        # Correlation with target variable if specified
-        target_correlations = {}
-        for col in data.columns:
-            if col != data.columns[-1]:  # Assuming last column might be target
-                target_correlations[col] = {
-                    'pearson': pearsonr(data[col].dropna(), data.iloc[:, -1].dropna())[0],
-                    'spearman': spearmanr(data[col].dropna(), data.iloc[:, -1].dropna())[0]
-                }
+        # Find the most interesting target correlations if there's a potential target variable
+        # Look for columns that might be targets (e.g., revenue, sales, outcome, target, etc.)
+        potential_targets = []
+        for col in meaningful_cols:
+            col_lower = col.lower()
+            if any(x in col_lower for x in ['revenue', 'sales', 'profit', 'outcome', 'target', 
+                                            'result', 'score', 'amount', 'total', 'price']):
+                potential_targets.append(col)
         
-        results['target_correlations'] = target_correlations
+        if potential_targets:
+            target_correlations = {}
+            for target in potential_targets:
+                target_corrs = []
+                for col in meaningful_cols:
+                    if col != target:
+                        try:
+                            corr_val = corr_matrix.loc[col, target]
+                            if abs(corr_val) > 0.2:  # At least weak correlation
+                                target_corrs.append({
+                                    'feature': col,
+                                    'correlation': corr_val,
+                                    'abs_correlation': abs(corr_val)
+                                })
+                        except:
+                            pass
+                
+                if target_corrs:
+                    target_corrs.sort(key=lambda x: x['abs_correlation'], reverse=True)
+                    target_correlations[target] = target_corrs[:10]  # Top 10 for each target
+            
+            results['target_correlations'] = target_correlations
+        
+        results['columns_analyzed'] = meaningful_cols
+        results['columns_excluded'] = columns_to_exclude
         
         return results
     
